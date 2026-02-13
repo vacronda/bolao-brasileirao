@@ -4,3 +4,4 @@ bolao.db
 .streamlit/secrets.toml
 .venv/
 venv/
+seed_fixtures.py

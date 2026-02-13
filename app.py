@@ -130,6 +130,12 @@ def page_bets():
         st.info("Nenhuma partida disponível no momento. Aguarde o admin cadastrar os jogos.")
         return
 
+    # League filter
+    leagues = sorted(set(m.get("league", "Brasileirão") for m in matches))
+    if len(leagues) > 1:
+        selected_league = st.selectbox("Liga", leagues, key="bet_league")
+        matches = [m for m in matches if m.get("league", "Brasileirão") == selected_league]
+
     # Group by round
     rounds: dict[int, list] = {}
     for m in matches:
@@ -271,29 +277,25 @@ def page_admin():
     with tab_add:
         st.subheader("Novo Jogo")
 
-        TEAMS = [
-            "Atlético-MG", "Athletico-PR", "Bahia", "Botafogo",
-            "Bragantino", "Corinthians", "Criciúma", "Cruzeiro",
-            "Cuiabá", "Flamengo", "Fluminense", "Fortaleza",
-            "Grêmio", "Internacional", "Juventude", "Mirassol",
-            "Palmeiras", "Santos", "São Paulo", "Sport", "Vasco",
-            "Vitória", "Ceará", "Goiás", "Coritiba", "Ponte Preta",
-        ]
+        LEAGUES = ["Brasileirão", "Premier League"]
 
         with st.form("add_match"):
+            league = st.selectbox("Liga", LEAGUES)
             round_num = st.number_input("Rodada", min_value=1, max_value=38, value=1)
             col1, col2 = st.columns(2)
-            home_team = col1.selectbox("Mandante", TEAMS, index=0)
-            away_team = col2.selectbox("Visitante", TEAMS, index=1)
+            home_team = col1.text_input("Mandante")
+            away_team = col2.text_input("Visitante")
             match_date = st.date_input("Data")
             match_time = st.time_input("Horário")
             submitted = st.form_submit_button("Adicionar Jogo", use_container_width=True)
             if submitted:
-                if home_team == away_team:
+                if not home_team or not away_team:
+                    st.error("Preencha os dois times!")
+                elif home_team == away_team:
                     st.error("Times iguais!")
                 else:
                     dt = datetime.combine(match_date, match_time).isoformat()
-                    db.add_match(round_num, home_team, away_team, dt)
+                    db.add_match(round_num, home_team, away_team, dt, league)
                     st.success(f"Jogo adicionado: {home_team} x {away_team}")
                     st.rerun()
 
@@ -301,6 +303,7 @@ def page_admin():
         with st.expander("Adicionar vários jogos (rodada inteira)"):
             st.caption("Adicione múltiplos jogos com a mesma rodada, data e horário.")
             with st.form("bulk_add"):
+                bulk_league = st.selectbox("Liga", LEAGUES, key="bulk_lg")
                 bulk_round = st.number_input("Rodada", min_value=1, max_value=38, value=1, key="bulk_r")
                 bulk_date = st.date_input("Data padrão", key="bulk_d")
                 bulk_time = st.time_input("Horário padrão", key="bulk_t")
@@ -317,7 +320,7 @@ def page_admin():
                     for line in lines:
                         parts = [p.strip() for p in line.split(" x ")]
                         if len(parts) == 2 and parts[0] and parts[1]:
-                            db.add_match(bulk_round, parts[0], parts[1], dt)
+                            db.add_match(bulk_round, parts[0], parts[1], dt, bulk_league)
                             count += 1
                     st.success(f"{count} jogo(s) adicionado(s)!")
                     st.rerun()
@@ -388,8 +391,9 @@ def page_admin():
                     result_str = f" — {m['home_score']} x {m['away_score']}"
 
                 cols = st.columns([5, 1])
+                league_tag = m.get("league", "")
                 cols[0].write(
-                    f"R{m['round_number'] or '?'} | {m['home_team']} x {m['away_team']} "
+                    f"[{league_tag}] R{m['round_number'] or '?'} | {m['home_team']} x {m['away_team']} "
                     f"| {date_str} | {status}{result_str}"
                 )
                 if cols[1].button("🗑️", key=f"del_{m['id']}"):

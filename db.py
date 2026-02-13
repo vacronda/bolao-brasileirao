@@ -132,6 +132,7 @@ def init_db():
             )""",
             """CREATE TABLE IF NOT EXISTS matches (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                league TEXT NOT NULL DEFAULT 'Brasileirão',
                 round_number INTEGER,
                 home_team TEXT NOT NULL,
                 away_team TEXT NOT NULL,
@@ -166,6 +167,12 @@ def init_db():
         for stmt in statements:
             conn.execute(stmt)
         conn.commit()
+
+        # Migration: add league column if missing
+        try:
+            conn.execute("SELECT league FROM matches LIMIT 1")
+        except Exception:
+            conn.execute("ALTER TABLE matches ADD COLUMN league TEXT NOT NULL DEFAULT 'Brasileirão'")
 
         row = _to_dict(conn.execute("SELECT COUNT(*) as cnt FROM scoring_config").fetchone())
         if row["cnt"] == 0:
@@ -212,13 +219,19 @@ def get_all_users() -> list[dict]:
 
 # ─── Match operations ─────────────────────────────────────────────────────────
 
-def add_match(round_number: int, home_team: str, away_team: str, match_time: str) -> int:
+def add_match(round_number: int, home_team: str, away_team: str, match_time: str, league: str = "Brasileirão") -> int:
     with get_conn() as conn:
         cur = conn.execute(
-            "INSERT INTO matches (round_number, home_team, away_team, match_time) VALUES (?, ?, ?, ?)",
-            (round_number, home_team, away_team, match_time),
+            "INSERT INTO matches (league, round_number, home_team, away_team, match_time) VALUES (?, ?, ?, ?, ?)",
+            (league, round_number, home_team, away_team, match_time),
         )
         return cur.lastrowid
+
+
+def get_leagues() -> list[str]:
+    with get_conn() as conn:
+        rows = conn.execute("SELECT DISTINCT league FROM matches ORDER BY league").fetchall()
+        return [_to_dict(r)["league"] for r in rows]
 
 
 def get_upcoming_matches() -> list[dict]:
