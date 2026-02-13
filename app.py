@@ -38,7 +38,6 @@ st.markdown("""
     [data-testid="stSidebar"] { min-width: 200px; max-width: 260px; }
     /* Hide Streamlit branding */
     #MainMenu, footer { visibility: hidden; }
-    header { visibility: hidden; }
     /* Score input compact */
     .stNumberInput > div > div > input { text-align: center; }
 </style>
