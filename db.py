@@ -27,8 +27,7 @@ def _connect():
     turso = _get_turso_config()
     if turso:
         import libsql_experimental as libsql
-        conn = libsql.connect("bolao.db", sync_url=turso[0], auth_token=turso[1])
-        conn.sync()
+        conn = libsql.connect(turso[0], auth_token=turso[1])
     else:
         import sqlite3
         db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bolao.db")
@@ -56,8 +55,6 @@ def get_conn():
     try:
         yield conn
         conn.commit()
-        if is_turso:
-            conn.sync()
     except Exception:
         conn.rollback()
         raise
