@@ -242,6 +242,15 @@ def get_upcoming_matches() -> list[dict]:
         return _to_dicts(rows)
 
 
+def get_matches_next_days(days: int = 7) -> list[dict]:
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM matches WHERE is_finished = 0 AND match_time <= datetime('now', '+' || ? || ' days') ORDER BY match_time ASC",
+            (str(days),),
+        ).fetchall()
+        return _to_dicts(rows)
+
+
 def get_finished_matches() -> list[dict]:
     with get_conn() as conn:
         rows = conn.execute(

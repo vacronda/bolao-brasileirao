@@ -1,10 +1,10 @@
 """
-Bolão do Brasileirão - Soccer Betting Pool for the Brazilian Série A.
+Bolão do Brasileirão - Soccer Betting Pool.
 Main Streamlit application.
 """
 
 import streamlit as st
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import db
 import auth
@@ -18,28 +18,76 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Mobile-friendly CSS
 st.markdown("""
 <style>
-    /* Compact layout for mobile */
-    .block-container { padding-top: 1rem; padding-bottom: 1rem; max-width: 720px; }
-    /* Match card styling */
-    .match-card {
-        background: #f8f9fa; border-radius: 10px; padding: 12px;
-        margin-bottom: 8px; border-left: 4px solid #1a5276;
+    .block-container { padding-top: 0.5rem; padding-bottom: 1rem; max-width: 720px; }
+
+    /* Hero banner */
+    .hero {
+        background: linear-gradient(135deg, #1a5276 0%, #2e86c1 50%, #27ae60 100%);
+        color: white; padding: 2rem 1.5rem; border-radius: 16px;
+        text-align: center; margin-bottom: 1.5rem;
     }
+    .hero h1 { font-size: 2rem; margin: 0; color: white; }
+    .hero p { font-size: 1rem; margin: 0.3rem 0 0; opacity: 0.9; color: #e8e8e8; }
+
+    /* Welcome bar (logged in) */
+    .welcome-bar {
+        background: linear-gradient(135deg, #1a5276 0%, #2e86c1 50%, #27ae60 100%);
+        color: white; padding: 1rem 1.5rem; border-radius: 12px;
+        margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between;
+    }
+    .welcome-bar h2 { font-size: 1.3rem; margin: 0; color: white; }
+    .welcome-bar p { margin: 0; opacity: 0.9; font-size: 0.9rem; color: #e8e8e8; }
+
+    /* Section headers */
+    .section-header {
+        display: flex; align-items: center; gap: 8px;
+        margin: 1.2rem 0 0.5rem; padding-bottom: 4px;
+        border-bottom: 2px solid #2e86c1;
+    }
+    .section-header span { font-size: 1.1rem; font-weight: 700; color: #1a5276; }
+
+    /* Match row for home preview */
+    .match-row {
+        background: #f8f9fa; border-radius: 10px; padding: 10px 14px;
+        margin-bottom: 6px; border-left: 4px solid #2e86c1;
+        display: flex; justify-content: space-between; align-items: center;
+    }
+    .match-row.brasileirao { border-left-color: #27ae60; }
+    .match-row.premier { border-left-color: #6c3483; }
+    .match-teams { font-weight: 600; font-size: 0.95rem; }
+    .match-meta { font-size: 0.78rem; color: #777; }
+
+    /* Leaderboard card */
+    .lb-card {
+        background: #fefefe; border: 1px solid #e8e8e8; border-radius: 10px;
+        padding: 10px 14px; margin-bottom: 5px;
+    }
+    .lb-card.top1 { border-left: 4px solid #f1c40f; background: #fffde7; }
+    .lb-card.top2 { border-left: 4px solid #95a5a6; background: #fafafa; }
+    .lb-card.top3 { border-left: 4px solid #cd6155; background: #fdf2f0; }
+    .lb-rank { font-weight: 800; font-size: 1.1rem; }
+    .lb-name { font-weight: 600; }
+    .lb-pts { color: #2e86c1; font-weight: 700; }
+
+    /* Login card */
+    .login-card {
+        background: white; border: 1px solid #ddd; border-radius: 12px;
+        padding: 1.5rem; margin-top: 0.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    /* Sidebar */
+    [data-testid="stSidebar"] { min-width: 200px; max-width: 260px; }
+    #MainMenu, footer { visibility: hidden; }
+    .stNumberInput > div > div > input { text-align: center; }
+
+    /* Match card styling (bets page) */
     .match-card-locked {
         background: #f0f0f0; border-radius: 10px; padding: 12px;
         margin-bottom: 8px; border-left: 4px solid #aaa; opacity: 0.7;
     }
-    /* Highlight row */
-    .highlight-row { background-color: #fff3cd !important; font-weight: bold; }
-    /* Sidebar adjustments */
-    [data-testid="stSidebar"] { min-width: 200px; max-width: 260px; }
-    /* Hide Streamlit branding */
-    #MainMenu, footer { visibility: hidden; }
-    /* Score input compact */
-    .stNumberInput > div > div > input { text-align: center; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -49,7 +97,7 @@ db.init_db()
 
 # ─── Sidebar Navigation ───────────────────────────────────────────────────────
 
-PAGES = ["Login / Registro", "Meus Palpites", "Classificação"]
+PAGES = ["Inicio", "Meus Palpites", "Classificacao"]
 
 with st.sidebar:
     st.title("⚽ Bolão")
@@ -63,58 +111,179 @@ with st.sidebar:
         pages = list(PAGES)
         if auth.is_admin():
             pages.append("Admin")
-        page = st.radio("Navegação", pages, index=1, label_visibility="collapsed")
+        page = st.radio("Navegação", pages, index=0, label_visibility="collapsed")
     else:
-        page = PAGES[0]
-        st.info("Faça login para acessar.")
+        pages = [PAGES[0]]
+        page = st.radio("Navegação", pages, index=0, label_visibility="collapsed")
 
 
-# ─── Page: Login / Register ───────────────────────────────────────────────────
+# ─── Home Dashboard (shared widget) ──────────────────────────────────────────
 
-def page_login():
-    st.header("⚽ Bolão do Brasileirão")
-    st.caption("Série A - Palpites entre amigos")
+def widget_upcoming_matches():
+    """Show matches in the next 7 days."""
+    now = datetime.now()
+    cutoff = now + timedelta(days=7)
+    all_upcoming = db.get_upcoming_matches()
+    soon = [m for m in all_upcoming if datetime.fromisoformat(m["match_time"]) <= cutoff]
 
-    tab_login, tab_register = st.tabs(["Entrar", "Criar Conta"])
+    if not soon:
+        st.caption("Nenhuma partida nos próximos 7 dias.")
+        return
 
-    with tab_login:
-        with st.form("login_form"):
-            username = st.text_input("Usuário")
-            password = st.text_input("Senha", type="password")
-            submitted = st.form_submit_button("Entrar", use_container_width=True)
-            if submitted:
-                if not username or not password:
-                    st.error("Preencha todos os campos.")
-                else:
-                    user = db.get_user_by_username(username)
-                    if user and auth.verify_password(password, user["password_hash"]):
-                        auth.login_user(user)
-                        st.rerun()
+    # Group by league
+    by_league: dict[str, list] = {}
+    for m in soon:
+        lg = m.get("league", "Brasileirão")
+        by_league.setdefault(lg, []).append(m)
+
+    for league, matches in sorted(by_league.items()):
+        css_class = "brasileirao" if "Brasil" in league else "premier"
+        flag = "🇧🇷" if "Brasil" in league else "🏴󠁧󠁢󠁥󠁮󠁧󠁿"
+        st.markdown(f"**{flag} {league}**")
+        for m in matches:
+            match_dt = datetime.fromisoformat(m["match_time"])
+            day_name = _weekday_pt(match_dt)
+            date_str = match_dt.strftime(f"%d/%m ({day_name}) %H:%M")
+            st.markdown(
+                f'<div class="match-row {css_class}">'
+                f'<span class="match-teams">{m["home_team"]} x {m["away_team"]}</span>'
+                f'<span class="match-meta">R{m["round_number"] or "?"} &middot; {date_str}</span>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+
+def _weekday_pt(dt: datetime) -> str:
+    days = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
+    return days[dt.weekday()]
+
+
+def widget_leaderboard_mini():
+    """Show top 5 of the leaderboard."""
+    leaderboard = db.get_leaderboard()
+    current_user = auth.get_current_user() if auth.is_logged_in() else None
+
+    if not leaderboard:
+        st.caption("Nenhuma pontuação registrada ainda.")
+        return
+
+    top = leaderboard[:5]
+    medals = ["🥇", "🥈", "🥉"]
+
+    for i, entry in enumerate(top):
+        rank = i + 1
+        medal = medals[i] if i < 3 else f"{rank}."
+        css = f"top{rank}" if rank <= 3 else ""
+        is_me = current_user and entry["user_id"] == current_user["id"]
+        name_extra = " 👈" if is_me else ""
+
+        st.markdown(
+            f'<div class="lb-card {css}" style="display:flex;justify-content:space-between;align-items:center;">'
+            f'<span><span class="lb-rank">{medal}</span> '
+            f'<span class="lb-name">{entry["username"]}{name_extra}</span></span>'
+            f'<span class="lb-pts">{entry["total_points"]} pts</span>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+    if len(leaderboard) > 5:
+        # Show current user if not in top 5
+        if current_user:
+            for i, entry in enumerate(leaderboard):
+                if entry["user_id"] == current_user["id"] and i >= 5:
+                    st.markdown(
+                        f'<div class="lb-card" style="display:flex;justify-content:space-between;align-items:center;border:2px solid #f0c040;">'
+                        f'<span><span class="lb-rank">{i+1}.</span> '
+                        f'<span class="lb-name">{entry["username"]} 👈</span></span>'
+                        f'<span class="lb-pts">{entry["total_points"]} pts</span>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+                    break
+
+
+# ─── Page: Home ──────────────────────────────────────────────────────────────
+
+def page_home():
+    if auth.is_logged_in():
+        user = auth.get_current_user()
+        st.markdown(
+            f'<div class="welcome-bar">'
+            f'<div><h2>⚽ Bolão</h2><p>Olá, {user["username"]}!</p></div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            '<div class="hero">'
+            '<h1>⚽ Bolão</h1>'
+            '<p>Palpites entre amigos &mdash; Brasileirão &amp; Premier League</p>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+    # ── Upcoming matches ──
+    st.markdown(
+        '<div class="section-header"><span>📅 Próximos Jogos (7 dias)</span></div>',
+        unsafe_allow_html=True,
+    )
+    widget_upcoming_matches()
+
+    # ── Leaderboard ──
+    st.markdown(
+        '<div class="section-header"><span>🏆 Classificação</span></div>',
+        unsafe_allow_html=True,
+    )
+    widget_leaderboard_mini()
+
+    # ── Login / Register (only if not logged in) ──
+    if not auth.is_logged_in():
+        st.markdown("---")
+        st.markdown(
+            '<div class="section-header"><span>🔑 Entrar ou Criar Conta</span></div>',
+            unsafe_allow_html=True,
+        )
+
+        tab_login, tab_register = st.tabs(["Entrar", "Criar Conta"])
+
+        with tab_login:
+            with st.form("login_form"):
+                username = st.text_input("Usuário")
+                password = st.text_input("Senha", type="password")
+                submitted = st.form_submit_button("Entrar", use_container_width=True)
+                if submitted:
+                    if not username or not password:
+                        st.error("Preencha todos os campos.")
                     else:
-                        st.error("Usuário ou senha incorretos.")
+                        u = db.get_user_by_username(username)
+                        if u and auth.verify_password(password, u["password_hash"]):
+                            auth.login_user(u)
+                            st.rerun()
+                        else:
+                            st.error("Usuário ou senha incorretos.")
 
-    with tab_register:
-        with st.form("register_form"):
-            new_user = st.text_input("Novo Usuário")
-            new_pass = st.text_input("Senha", type="password", key="reg_pass")
-            new_pass2 = st.text_input("Confirmar Senha", type="password", key="reg_pass2")
-            submitted = st.form_submit_button("Criar Conta", use_container_width=True)
-            if submitted:
-                if not new_user or not new_pass:
-                    st.error("Preencha todos os campos.")
-                elif len(new_user) < 3:
-                    st.error("Usuário deve ter pelo menos 3 caracteres.")
-                elif len(new_pass) < 4:
-                    st.error("Senha deve ter pelo menos 4 caracteres.")
-                elif new_pass != new_pass2:
-                    st.error("As senhas não coincidem.")
-                else:
-                    hashed = auth.hash_password(new_pass)
-                    uid = db.create_user(new_user, hashed)
-                    if uid:
-                        st.success("Conta criada! Faça login.")
+        with tab_register:
+            with st.form("register_form"):
+                new_user = st.text_input("Novo Usuário")
+                new_pass = st.text_input("Senha", type="password", key="reg_pass")
+                new_pass2 = st.text_input("Confirmar Senha", type="password", key="reg_pass2")
+                submitted = st.form_submit_button("Criar Conta", use_container_width=True)
+                if submitted:
+                    if not new_user or not new_pass:
+                        st.error("Preencha todos os campos.")
+                    elif len(new_user) < 3:
+                        st.error("Usuário deve ter pelo menos 3 caracteres.")
+                    elif len(new_pass) < 4:
+                        st.error("Senha deve ter pelo menos 4 caracteres.")
+                    elif new_pass != new_pass2:
+                        st.error("As senhas não coincidem.")
                     else:
-                        st.error("Usuário já existe.")
+                        hashed = auth.hash_password(new_pass)
+                        uid = db.create_user(new_user, hashed)
+                        if uid:
+                            st.success("Conta criada! Faça login.")
+                        else:
+                            st.error("Usuário já existe.")
 
 
 # ─── Page: My Bets ────────────────────────────────────────────────────────────
@@ -157,7 +326,6 @@ def page_bets():
             date_str = match_dt.strftime("%d/%m %H:%M")
 
             if is_locked:
-                # Locked match display
                 st.markdown(f'<div class="match-card-locked">', unsafe_allow_html=True)
                 cols = st.columns([3, 1, 1, 1, 3])
                 cols[0].write(f"**{m['home_team']}**")
@@ -175,7 +343,6 @@ def page_bets():
                     st.caption(f"Pontos: **{existing['points_awarded']}**")
                 st.markdown('</div>', unsafe_allow_html=True)
             else:
-                # Open match - allow betting
                 with st.form(key=f"bet_{m['id']}"):
                     st.markdown(f"**{date_str}**")
                     cols = st.columns([3, 1, 1, 1, 3])
@@ -232,7 +399,6 @@ def page_leaderboard():
         | Errou | **{config['wrong']}** |
         """)
 
-    # Build table
     for i, entry in enumerate(leaderboard):
         rank = i + 1
         is_me = user and entry["user_id"] == user["id"]
@@ -273,11 +439,11 @@ def page_admin():
         "Adicionar Jogos", "Inserir Resultados", "Pontuação", "Gerenciar Jogos"
     ])
 
+    LEAGUES = ["Brasileirão", "Premier League"]
+
     # --- Add Matches ---
     with tab_add:
         st.subheader("Novo Jogo")
-
-        LEAGUES = ["Brasileirão", "Premier League"]
 
         with st.form("add_match"):
             league = st.selectbox("Liga", LEAGUES)
@@ -299,7 +465,6 @@ def page_admin():
                     st.success(f"Jogo adicionado: {home_team} x {away_team}")
                     st.rerun()
 
-        # Bulk add
         with st.expander("Adicionar vários jogos (rodada inteira)"):
             st.caption("Adicione múltiplos jogos com a mesma rodada, data e horário.")
             with st.form("bulk_add"):
@@ -336,7 +501,8 @@ def page_admin():
                 match_dt = datetime.fromisoformat(m["match_time"])
                 date_str = match_dt.strftime("%d/%m %H:%M")
                 with st.form(key=f"result_{m['id']}"):
-                    st.markdown(f"**R{m['round_number'] or '?'} — {date_str}**")
+                    league_tag = m.get("league", "")
+                    st.markdown(f"**[{league_tag}] R{m['round_number'] or '?'} — {date_str}**")
                     cols = st.columns([3, 1, 1, 1, 3])
                     cols[0].write(f"**{m['home_team']}**")
                     home_s = cols[1].number_input(
@@ -404,14 +570,11 @@ def page_admin():
 # ─── Router ───────────────────────────────────────────────────────────────────
 
 if page == PAGES[0]:
-    if auth.is_logged_in():
-        page_bets()
-    else:
-        page_login()
+    page_home()
 elif page == PAGES[1]:
     if not auth.is_logged_in():
         st.warning("Faça login para ver seus palpites.")
-        page_login()
+        page_home()
     else:
         page_bets()
 elif page == PAGES[2]:
