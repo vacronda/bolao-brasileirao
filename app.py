@@ -98,6 +98,7 @@ st.markdown("""
     .lb-name-cell { font-weight: 600; color: #222; }
     .lb-pts-cell { font-weight: 700; color: #00a86b; }
     .lb-exact-cell { font-size: 0.8rem; color: #888; }
+    .lb-stat-cell { font-size: 0.8rem; color: #888; text-align: center !important; }
     .lb-me td { background: #e8f8f0; }
     .lb-top1 td:first-child { border-left: 4px solid #f5c518; }
     .lb-top2 td:first-child { border-left: 4px solid #aaa; }
@@ -598,14 +599,17 @@ def page_leaderboard():
             f'<tr class="{row_class}">'
             f'<td class="lb-rank-cell">{medal}</td>'
             f'<td class="lb-name-cell">{entry["username"]}{me_tag}</td>'
-            f'<td class="lb-exact-cell">{entry["exact_count"]} exato(s)</td>'
+            f'<td class="lb-stat-cell">{entry["total_bets"]}</td>'
+            f'<td class="lb-stat-cell">{entry["exact_count"]}</td>'
+            f'<td class="lb-stat-cell">{entry["zero_count"]}</td>'
+            f'<td class="lb-stat-cell">{entry["missed_count"]}</td>'
             f'<td class="lb-pts-cell">{entry["total_points"]} pts</td>'
             f'</tr>'
         )
 
     st.markdown(
         f'<table class="lb-table">'
-        f'<thead><tr><th></th><th>Jogador</th><th>Exatos</th><th>Pontos</th></tr></thead>'
+        f'<thead><tr><th></th><th>Jogador</th><th>Palpites</th><th>Cravadas</th><th>Zeradas</th><th>Sem palpite</th><th>Pontos</th></tr></thead>'
         f'<tbody>{rows_html}</tbody></table>',
         unsafe_allow_html=True,
     )

@@ -195,6 +195,18 @@ def init_db():
                 ("admin", hash_password("admin123")),
             )
 
+        # Create bot users (Olavo & PVC) if they don't exist
+        for bot_name in ("Olavo", "PVC"):
+            existing = _to_dict(
+                conn.execute("SELECT id FROM users WHERE username = ?", (bot_name,)).fetchone()
+            )
+            if not existing:
+                from auth import hash_password
+                conn.execute(
+                    "INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, 0)",
+                    (bot_name, hash_password(f"bot-{bot_name}-no-login")),
+                )
+
 
 # ─── User operations ──────────────────────────────────────────────────────────
 
@@ -395,7 +407,9 @@ def get_leaderboard() -> list[dict]:
                 COALESCE(SUM(CASE WHEN b.points_awarded = (
                     SELECT exact_score FROM scoring_config WHERE id = 1
                 ) THEN 1 ELSE 0 END), 0) as exact_count,
-                COUNT(b.id) as total_bets
+                COALESCE(SUM(CASE WHEN b.points_awarded = 0 THEN 1 ELSE 0 END), 0) as zero_count,
+                COUNT(b.id) as total_bets,
+                (SELECT COUNT(*) FROM matches WHERE is_finished = 1) - COUNT(b.id) as missed_count
             FROM users u
             LEFT JOIN bets b ON b.user_id = u.id AND b.points_awarded IS NOT NULL
             WHERE u.is_admin = 0

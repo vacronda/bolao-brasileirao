@@ -9,6 +9,7 @@ Env vars: TURSO_URL, TURSO_AUTH_TOKEN, FOOTBALL_API_KEY, ODDS_API_KEY (optional)
 
 import os
 import json
+import random
 import urllib.request
 from datetime import datetime, timedelta
 
@@ -245,6 +246,132 @@ def fetch_and_store_odds(conn, unfinished):
     print(f"[ODDS] Updated odds for {odds_updated} match(es).")
 
 
+# ─── Bot betting ──────────────────────────────────────────────────────────
+
+# Realistic football score distribution (score tuple, weight)
+SCORE_DISTRIBUTION = [
+    ((1, 0), 20), ((0, 0), 14), ((1, 1), 18), ((2, 1), 16), ((2, 0), 14),
+    ((0, 1), 20), ((1, 2), 16), ((0, 2), 14), ((3, 1), 8), ((3, 0), 6),
+    ((2, 2), 10), ((1, 3), 8), ((0, 3), 6), ((3, 2), 5), ((2, 3), 5),
+    ((4, 0), 3), ((4, 1), 3), ((0, 4), 3), ((1, 4), 3), ((4, 2), 2),
+    ((3, 3), 2),
+]
+SCORES = [s for s, _ in SCORE_DISTRIBUTION]
+WEIGHTS = [w for _, w in SCORE_DISTRIBUTION]
+
+
+def olavo_pick(match_id: int) -> tuple[int, int]:
+    """Pick a random but deterministic score for Olavo based on match_id."""
+    rng = random.Random(match_id)
+    return rng.choices(SCORES, weights=WEIGHTS, k=1)[0]
+
+
+def pvc_pick(odds: dict | None) -> tuple[int, int]:
+    """Pick a score based on betting odds for PVC."""
+    if not odds:
+        return (1, 1)
+
+    home_odds = odds.get("home_win")
+    draw_odds = odds.get("draw")
+    away_odds = odds.get("away_win")
+
+    if not all(v and v > 0 for v in [home_odds, draw_odds, away_odds]):
+        return (1, 1)
+
+    home_prob = 1 / home_odds
+    draw_prob = 1 / draw_odds
+    away_prob = 1 / away_odds
+
+    # Draw is most likely
+    if draw_prob > home_prob and draw_prob > away_prob:
+        return (1, 1)
+
+    # Home favorite
+    if home_prob >= away_prob:
+        if home_prob > 0.55:
+            return (2, 0)
+        elif home_prob > 0.40:
+            return (2, 1)
+        else:
+            return (1, 0)
+    # Away favorite
+    else:
+        if away_prob > 0.55:
+            return (0, 2)
+        elif away_prob > 0.40:
+            return (1, 2)
+        else:
+            return (0, 1)
+
+
+def place_bot_bets(conn, unfinished):
+    """Place bets for Olavo and PVC on upcoming matches."""
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M")
+
+    # Get or create bot user IDs
+    bots = {}
+    for name in ("Olavo", "PVC"):
+        row = conn.execute("SELECT id FROM users WHERE username = ?", (name,)).fetchone()
+        if row:
+            cols = [d[0] for d in conn.execute("SELECT id FROM users WHERE username = ?", (name,)).description]
+            bots[name] = dict(zip(cols, row))["id"] if not isinstance(row, dict) else row["id"]
+        else:
+            # Create bot user directly (auto_score.py doesn't go through init_db)
+            import hashlib
+            fake_hash = hashlib.sha256(f"bot-{name}-no-login".encode()).hexdigest()
+            conn.execute(
+                "INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, 0)",
+                (name, fake_hash),
+            )
+            row = conn.execute("SELECT id FROM users WHERE username = ?", (name,)).fetchone()
+            cols = [d[0] for d in conn.execute("SELECT id FROM users WHERE username = ?", (name,)).description]
+            bots[name] = dict(zip(cols, row))["id"] if not isinstance(row, dict) else row["id"]
+            print(f"[BOTS] Created bot user: {name} (id={bots[name]})")
+
+    # Get odds for all unfinished matches
+    match_ids = [m["id"] for m in unfinished]
+    odds_map = {}
+    if match_ids:
+        placeholders = ",".join("?" for _ in match_ids)
+        cur = conn.execute(
+            f"SELECT * FROM match_odds WHERE match_id IN ({placeholders})",
+            tuple(match_ids),
+        )
+        cols = [d[0] for d in cur.description]
+        for r in cur.fetchall():
+            row_dict = dict(zip(cols, r))
+            odds_map[row_dict["match_id"]] = row_dict
+
+    bets_placed = 0
+    for m in unfinished:
+        # Skip matches that have already started
+        if m["match_time"][:16] <= now:
+            continue
+
+        match_id = m["id"]
+        odds = odds_map.get(match_id)
+
+        for bot_name, user_id in bots.items():
+            if bot_name == "Olavo":
+                h, a = olavo_pick(match_id)
+            else:
+                h, a = pvc_pick(odds)
+
+            conn.execute(
+                """INSERT INTO bets (user_id, match_id, home_score, away_score, updated_at)
+                   VALUES (?, ?, ?, ?, datetime('now'))
+                   ON CONFLICT(user_id, match_id) DO UPDATE SET
+                       home_score = excluded.home_score,
+                       away_score = excluded.away_score,
+                       updated_at = datetime('now')
+                """,
+                (user_id, match_id, h, a),
+            )
+            bets_placed += 1
+
+    print(f"[BOTS] Placed {bets_placed} bot bet(s).")
+
+
 def main():
     conn = libsql.connect(TURSO_URL, auth_token=TURSO_AUTH_TOKEN)
 
@@ -400,6 +527,9 @@ def main():
     db_cols2 = [d[0] for d in cur2.description]
     still_unfinished = [dict(zip(db_cols2, r)) for r in cur2.fetchall()]
     fetch_and_store_odds(conn, still_unfinished)
+
+    # ── 4. Place bot bets ─────────────────────────────────────────────
+    place_bot_bets(conn, still_unfinished)
 
     conn.commit()
     print(f"\nDone. Updated {updated} result(s), {times_updated} match time(s).")
