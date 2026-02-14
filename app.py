@@ -203,6 +203,86 @@ def widget_leaderboard_mini():
                     break
 
 
+def widget_upcoming_bets():
+    """Show next 7 days matches with inline betting for logged-in users."""
+    user = auth.get_current_user()
+    now = datetime.now()
+    cutoff = now + timedelta(days=7)
+    all_upcoming = db.get_upcoming_matches()
+    soon = [m for m in all_upcoming
+            if now < datetime.fromisoformat(m["match_time"]) <= cutoff]
+
+    if not soon:
+        st.caption("Nenhuma partida nos próximos 7 dias.")
+        return
+
+    user_bets = db.get_user_bets(user["id"])
+
+    # Group by league
+    by_league: dict[str, list] = {}
+    for m in soon:
+        lg = m.get("league", "Brasileirão")
+        by_league.setdefault(lg, []).append(m)
+
+    for league, matches in sorted(by_league.items()):
+        flag = "🇧🇷" if "Brasil" in league else "🏴󠁧󠁢󠁥󠁮󠁧󠁿"
+        st.markdown(f"**{flag} {league}**")
+
+        for m in matches:
+            match_dt = datetime.fromisoformat(m["match_time"])
+            is_locked = now >= match_dt
+            existing = user_bets.get(m["id"])
+            day_name = _weekday_pt(match_dt)
+            date_str = match_dt.strftime(f"%d/%m ({day_name}) %H:%M")
+
+            if is_locked:
+                # Show locked bet (already started)
+                if existing:
+                    score_txt = f"{existing['home_score']} x {existing['away_score']}"
+                else:
+                    score_txt = "- x -"
+                css_class = "brasileirao" if "Brasil" in league else "premier"
+                st.markdown(
+                    f'<div class="match-row {css_class}" style="opacity:0.6;">'
+                    f'<span class="match-teams">🔒 {m["home_team"]} {score_txt} {m["away_team"]}</span>'
+                    f'<span class="match-meta">{date_str}</span>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                with st.form(key=f"home_bet_{m['id']}"):
+                    st.caption(f"R{m['round_number'] or '?'} · {date_str}")
+                    cols = st.columns([3, 1, 0.5, 1, 3])
+                    cols[0].markdown(f"**{m['home_team']}**")
+                    home_val = existing["home_score"] if existing else 0
+                    away_val = existing["away_score"] if existing else 0
+                    home_score = cols[1].number_input(
+                        "H", min_value=0, max_value=20, value=home_val,
+                        label_visibility="collapsed", key=f"hb_{m['id']}"
+                    )
+                    cols[2].markdown(
+                        "<div style='text-align:center;padding-top:8px;font-weight:bold;'>x</div>",
+                        unsafe_allow_html=True,
+                    )
+                    away_score = cols[3].number_input(
+                        "A", min_value=0, max_value=20, value=away_val,
+                        label_visibility="collapsed", key=f"ab_{m['id']}"
+                    )
+                    cols[4].markdown(f"**{m['away_team']}**")
+
+                    col_btn, col_status = st.columns([1, 1])
+                    submitted = col_btn.form_submit_button("Salvar", use_container_width=True)
+                    if existing:
+                        col_status.success("✅ Salvo")
+
+                    if submitted:
+                        ok = db.upsert_bet(user["id"], m["id"], int(home_score), int(away_score))
+                        if ok:
+                            st.rerun()
+                        else:
+                            st.error("Não foi possível salvar. A partida pode já ter começado.")
+
+
 # ─── Page: Home ──────────────────────────────────────────────────────────────
 
 def page_home():
@@ -278,12 +358,15 @@ def page_home():
     )
     widget_leaderboard_mini()
 
-    # ── Upcoming matches ──
+    # ── Upcoming matches (with betting if logged in) ──
     st.markdown(
         '<div class="section-header"><span>📅 Próximos Jogos (7 dias)</span></div>',
         unsafe_allow_html=True,
     )
-    widget_upcoming_matches()
+    if auth.is_logged_in():
+        widget_upcoming_bets()
+    else:
+        widget_upcoming_matches()
 
 
 # ─── Page: My Bets ────────────────────────────────────────────────────────────
