@@ -20,74 +20,99 @@ st.set_page_config(
 
 st.markdown("""
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+    /* ── Base ─────────────────────────────────────────────────────── */
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     .block-container { padding-top: 0.5rem; padding-bottom: 1rem; max-width: 720px; }
+    #MainMenu, footer { visibility: hidden; }
+    [data-testid="stSidebar"] { min-width: 200px; max-width: 260px; }
+    .stNumberInput > div > div > input { text-align: center; font-weight: 600; font-size: 1.05rem; }
 
-    /* Hero banner */
+    /* ── Hero banner (logged out) ─────────────────────────────────── */
     .hero {
-        background: linear-gradient(135deg, #1a5276 0%, #2e86c1 50%, #27ae60 100%);
-        color: white; padding: 2rem 1.5rem; border-radius: 16px;
-        text-align: center; margin-bottom: 1.5rem;
+        background: linear-gradient(135deg, #1b1b2f 0%, #162447 60%, #1f4037 100%);
+        color: white; padding: 2.5rem 1.5rem; border-radius: 14px;
+        text-align: center; margin-bottom: 1.2rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
     }
-    .hero h1 { font-size: 2rem; margin: 0; color: white; }
-    .hero p { font-size: 1rem; margin: 0.3rem 0 0; opacity: 0.9; color: #e8e8e8; }
+    .hero h1 { font-size: 2.2rem; margin: 0; color: white; font-weight: 800; letter-spacing: -0.5px; }
+    .hero p { font-size: 0.95rem; margin: 0.5rem 0 0; color: #b0bec5; font-weight: 400; }
 
-    /* Welcome bar (logged in) */
+    /* ── Welcome bar (logged in) ──────────────────────────────────── */
     .welcome-bar {
-        background: linear-gradient(135deg, #1a5276 0%, #2e86c1 50%, #27ae60 100%);
+        background: linear-gradient(135deg, #1b1b2f 0%, #162447 60%, #1f4037 100%);
         color: white; padding: 1rem 1.5rem; border-radius: 12px;
-        margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
     }
-    .welcome-bar h2 { font-size: 1.3rem; margin: 0; color: white; }
-    .welcome-bar p { margin: 0; opacity: 0.9; font-size: 0.9rem; color: #e8e8e8; }
+    .welcome-bar h2 { font-size: 1.3rem; margin: 0; color: white; font-weight: 700; }
+    .welcome-bar p { margin: 0.15rem 0 0; font-size: 0.85rem; color: #b0bec5; }
 
-    /* Section headers */
+    /* ── Section headers ──────────────────────────────────────────── */
     .section-header {
         display: flex; align-items: center; gap: 8px;
-        margin: 1.2rem 0 0.5rem; padding-bottom: 4px;
-        border-bottom: 2px solid #2e86c1;
+        margin: 1.5rem 0 0.6rem; padding-bottom: 6px;
+        border-bottom: 3px solid #00a86b;
     }
-    .section-header span { font-size: 1.1rem; font-weight: 700; color: #1a5276; }
+    .section-header span { font-size: 1rem; font-weight: 700; color: #222; text-transform: uppercase; letter-spacing: 0.5px; }
 
-    /* Match row for home preview */
-    .match-row {
-        background: #f8f9fa; border-radius: 10px; padding: 10px 14px;
-        margin-bottom: 6px; border-left: 4px solid #2e86c1;
-        display: flex; justify-content: space-between; align-items: center;
+    /* ── League label ─────────────────────────────────────────────── */
+    .league-label {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: #222; color: white; padding: 4px 12px; border-radius: 6px;
+        font-size: 0.8rem; font-weight: 600; margin: 10px 0 6px;
+        text-transform: uppercase; letter-spacing: 0.3px;
     }
-    .match-row.brasileirao { border-left-color: #27ae60; }
-    .match-row.premier { border-left-color: #6c3483; }
-    .match-teams { font-weight: 600; font-size: 0.95rem; }
-    .match-meta { font-size: 0.78rem; color: #777; }
+    .league-label.brasileirao { background: #00a86b; }
+    .league-label.premier { background: #3d185b; }
 
-    /* Leaderboard card */
-    .lb-card {
-        background: #fefefe; border: 1px solid #e8e8e8; border-radius: 10px;
-        padding: 10px 14px; margin-bottom: 5px;
+    /* ── Match card (home preview, read-only) ─────────────────────── */
+    .match-card {
+        background: #fff; border-radius: 10px; padding: 12px 16px;
+        margin-bottom: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+        display: flex; align-items: center; justify-content: space-between;
+        border-left: 4px solid #e0e0e0; transition: box-shadow 0.15s;
     }
-    .lb-card.top1 { border-left: 4px solid #f1c40f; background: #fffde7; }
-    .lb-card.top2 { border-left: 4px solid #95a5a6; background: #fafafa; }
-    .lb-card.top3 { border-left: 4px solid #cd6155; background: #fdf2f0; }
-    .lb-rank { font-weight: 800; font-size: 1.1rem; }
-    .lb-name { font-weight: 600; }
-    .lb-pts { color: #2e86c1; font-weight: 700; }
+    .match-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    .match-card.brasileirao { border-left-color: #00a86b; }
+    .match-card.premier { border-left-color: #3d185b; }
+    .match-card.locked { opacity: 0.55; }
+    .mc-teams { font-weight: 600; font-size: 0.92rem; color: #222; }
+    .mc-meta { font-size: 0.75rem; color: #999; font-weight: 500; }
 
-    /* Login card */
-    .login-card {
-        background: white; border: 1px solid #ddd; border-radius: 12px;
-        padding: 1.5rem; margin-top: 0.5rem;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    /* ── Leaderboard table ────────────────────────────────────────── */
+    .lb-table { width: 100%; border-collapse: separate; border-spacing: 0 4px; }
+    .lb-table th {
+        text-align: left; font-size: 0.7rem; text-transform: uppercase;
+        color: #999; font-weight: 600; padding: 0 12px 4px; letter-spacing: 0.5px;
     }
-
-    /* Sidebar */
-    [data-testid="stSidebar"] { min-width: 200px; max-width: 260px; }
-    #MainMenu, footer { visibility: hidden; }
-    .stNumberInput > div > div > input { text-align: center; }
-
-    /* Match card styling (bets page) */
-    .match-card-locked {
-        background: #f0f0f0; border-radius: 10px; padding: 12px;
-        margin-bottom: 8px; border-left: 4px solid #aaa; opacity: 0.7;
+    .lb-table th:last-child, .lb-table td:last-child { text-align: right; }
+    .lb-table td {
+        background: #fff; padding: 10px 12px; font-size: 0.9rem;
     }
+    .lb-table tr td:first-child { border-radius: 8px 0 0 8px; }
+    .lb-table tr td:last-child { border-radius: 0 8px 8px 0; }
+    .lb-table tr { box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+    .lb-rank-cell { font-weight: 800; font-size: 1rem; width: 40px; text-align: center !important; }
+    .lb-name-cell { font-weight: 600; color: #222; }
+    .lb-pts-cell { font-weight: 700; color: #00a86b; }
+    .lb-exact-cell { font-size: 0.8rem; color: #888; }
+    .lb-me td { background: #e8f8f0; }
+    .lb-top1 td:first-child { border-left: 4px solid #f5c518; }
+    .lb-top2 td:first-child { border-left: 4px solid #aaa; }
+    .lb-top3 td:first-child { border-left: 4px solid #cd7f32; }
+
+    /* ── Scoring rules card ───────────────────────────────────────── */
+    .rules-grid {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px;
+    }
+    .rule-chip {
+        background: #fff; border-radius: 8px; padding: 10px 14px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06); text-align: center;
+    }
+    .rule-chip .pts { font-size: 1.3rem; font-weight: 800; color: #00a86b; }
+    .rule-chip .label { font-size: 0.72rem; color: #666; margin-top: 2px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -131,7 +156,6 @@ def widget_upcoming_matches():
         st.caption("Nenhuma partida nos próximos 7 dias.")
         return
 
-    # Group by league
     by_league: dict[str, list] = {}
     for m in soon:
         lg = m.get("league", "Brasileirão")
@@ -140,15 +164,15 @@ def widget_upcoming_matches():
     for league, matches in sorted(by_league.items()):
         css_class = "brasileirao" if "Brasil" in league else "premier"
         flag = "🇧🇷" if "Brasil" in league else "🏴󠁧󠁢󠁥󠁮󠁧󠁿"
-        st.markdown(f"**{flag} {league}**")
+        st.markdown(f'<div class="league-label {css_class}">{flag} {league}</div>', unsafe_allow_html=True)
         for m in matches:
             match_dt = datetime.fromisoformat(m["match_time"])
             day_name = _weekday_pt(match_dt)
             date_str = match_dt.strftime(f"%d/%m ({day_name}) %H:%M")
             st.markdown(
-                f'<div class="match-row {css_class}">'
-                f'<span class="match-teams">{m["home_team"]} x {m["away_team"]}</span>'
-                f'<span class="match-meta">R{m["round_number"] or "?"} &middot; {date_str}</span>'
+                f'<div class="match-card {css_class}">'
+                f'<span class="mc-teams">{m["home_team"]} x {m["away_team"]}</span>'
+                f'<span class="mc-meta">R{m["round_number"] or "?"} &middot; {date_str}</span>'
                 f'</div>',
                 unsafe_allow_html=True,
             )
@@ -168,39 +192,49 @@ def widget_leaderboard_mini():
         st.caption("Nenhuma pontuação registrada ainda.")
         return
 
-    top = leaderboard[:5]
-    medals = ["🥇", "🥈", "🥉"]
+    medals = {1: "🥇", 2: "🥈", 3: "🥉"}
 
+    # Decide which entries to show
+    top = leaderboard[:5]
+    extra_me = None
+    if current_user and len(leaderboard) > 5:
+        for i, entry in enumerate(leaderboard):
+            if entry["user_id"] == current_user["id"] and i >= 5:
+                extra_me = (i, entry)
+                break
+
+    rows_html = ""
     for i, entry in enumerate(top):
         rank = i + 1
-        medal = medals[i] if i < 3 else f"{rank}."
-        css = f"top{rank}" if rank <= 3 else ""
+        medal = medals.get(rank, f"{rank}.")
         is_me = current_user and entry["user_id"] == current_user["id"]
-        name_extra = " 👈" if is_me else ""
-
-        st.markdown(
-            f'<div class="lb-card {css}" style="display:flex;justify-content:space-between;align-items:center;">'
-            f'<span><span class="lb-rank">{medal}</span> '
-            f'<span class="lb-name">{entry["username"]}{name_extra}</span></span>'
-            f'<span class="lb-pts">{entry["total_points"]} pts</span>'
-            f'</div>',
-            unsafe_allow_html=True,
+        row_class = "lb-me " if is_me else ""
+        row_class += f"lb-top{rank}" if rank <= 3 else ""
+        me_tag = " &#9668;" if is_me else ""
+        rows_html += (
+            f'<tr class="{row_class}">'
+            f'<td class="lb-rank-cell">{medal}</td>'
+            f'<td class="lb-name-cell">{entry["username"]}{me_tag}</td>'
+            f'<td class="lb-pts-cell">{entry["total_points"]} pts</td>'
+            f'</tr>'
         )
 
-    if len(leaderboard) > 5:
-        # Show current user if not in top 5
-        if current_user:
-            for i, entry in enumerate(leaderboard):
-                if entry["user_id"] == current_user["id"] and i >= 5:
-                    st.markdown(
-                        f'<div class="lb-card" style="display:flex;justify-content:space-between;align-items:center;border:2px solid #f0c040;">'
-                        f'<span><span class="lb-rank">{i+1}.</span> '
-                        f'<span class="lb-name">{entry["username"]} 👈</span></span>'
-                        f'<span class="lb-pts">{entry["total_points"]} pts</span>'
-                        f'</div>',
-                        unsafe_allow_html=True,
-                    )
-                    break
+    if extra_me:
+        idx, entry = extra_me
+        rows_html += (
+            f'<tr class="lb-me" style="border-top:2px dashed #ccc;">'
+            f'<td class="lb-rank-cell">{idx+1}.</td>'
+            f'<td class="lb-name-cell">{entry["username"]} &#9668;</td>'
+            f'<td class="lb-pts-cell">{entry["total_points"]} pts</td>'
+            f'</tr>'
+        )
+
+    st.markdown(
+        f'<table class="lb-table">'
+        f'<thead><tr><th></th><th>Jogador</th><th>Pontos</th></tr></thead>'
+        f'<tbody>{rows_html}</tbody></table>',
+        unsafe_allow_html=True,
+    )
 
 
 def widget_upcoming_bets():
@@ -226,7 +260,8 @@ def widget_upcoming_bets():
 
     for league, matches in sorted(by_league.items()):
         flag = "🇧🇷" if "Brasil" in league else "🏴󠁧󠁢󠁥󠁮󠁧󠁿"
-        st.markdown(f"**{flag} {league}**")
+        css_class = "brasileirao" if "Brasil" in league else "premier"
+        st.markdown(f'<div class="league-label {css_class}">{flag} {league}</div>', unsafe_allow_html=True)
 
         for m in matches:
             match_dt = datetime.fromisoformat(m["match_time"])
@@ -236,16 +271,14 @@ def widget_upcoming_bets():
             date_str = match_dt.strftime(f"%d/%m ({day_name}) %H:%M")
 
             if is_locked:
-                # Show locked bet (already started)
                 if existing:
                     score_txt = f"{existing['home_score']} x {existing['away_score']}"
                 else:
                     score_txt = "- x -"
-                css_class = "brasileirao" if "Brasil" in league else "premier"
                 st.markdown(
-                    f'<div class="match-row {css_class}" style="opacity:0.6;">'
-                    f'<span class="match-teams">🔒 {m["home_team"]} {score_txt} {m["away_team"]}</span>'
-                    f'<span class="match-meta">{date_str}</span>'
+                    f'<div class="match-card {css_class} locked">'
+                    f'<span class="mc-teams">🔒 {m["home_team"]} {score_txt} {m["away_team"]}</span>'
+                    f'<span class="mc-meta">{date_str}</span>'
                     f'</div>',
                     unsafe_allow_html=True,
                 )
@@ -475,7 +508,10 @@ def page_bets():
 # ─── Page: Leaderboard ────────────────────────────────────────────────────────
 
 def page_leaderboard():
-    st.header("🏆 Classificação")
+    st.markdown(
+        '<div class="section-header"><span>🏆 Classificação Geral</span></div>',
+        unsafe_allow_html=True,
+    )
 
     leaderboard = db.get_leaderboard()
     user = auth.get_current_user() if auth.is_logged_in() else None
@@ -485,42 +521,41 @@ def page_leaderboard():
         return
 
     config = db.get_scoring_config()
-    with st.expander("ℹ️ Regras de Pontuação"):
-        st.markdown(f"""
-        | Tipo | Pontos |
-        |------|--------|
-        | Placar exato | **{config['exact_score']}** |
-        | Vencedor + saldo de gols | **{config['correct_winner_goal_diff']}** |
-        | Acertou o vencedor | **{config['correct_winner']}** |
-        | Acertou empate | **{config['correct_draw']}** |
-        | Errou | **{config['wrong']}** |
-        """)
+    with st.expander("Regras de Pontuação"):
+        st.markdown(
+            f'<div class="rules-grid">'
+            f'<div class="rule-chip"><div class="pts">{config["exact_score"]}</div><div class="label">Placar exato</div></div>'
+            f'<div class="rule-chip"><div class="pts">{config["correct_winner_goal_diff"]}</div><div class="label">Vencedor + saldo</div></div>'
+            f'<div class="rule-chip"><div class="pts">{config["correct_winner"]}</div><div class="label">Acertou vencedor</div></div>'
+            f'<div class="rule-chip"><div class="pts">{config["correct_draw"]}</div><div class="label">Acertou empate</div></div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
+    medals = {1: "🥇", 2: "🥈", 3: "🥉"}
+    rows_html = ""
     for i, entry in enumerate(leaderboard):
         rank = i + 1
+        medal = medals.get(rank, f"{rank}.")
         is_me = user and entry["user_id"] == user["id"]
+        row_class = "lb-me " if is_me else ""
+        row_class += f"lb-top{rank}" if rank <= 3 else ""
+        me_tag = " &#9668;" if is_me else ""
+        rows_html += (
+            f'<tr class="{row_class}">'
+            f'<td class="lb-rank-cell">{medal}</td>'
+            f'<td class="lb-name-cell">{entry["username"]}{me_tag}</td>'
+            f'<td class="lb-exact-cell">{entry["exact_count"]} exato(s)</td>'
+            f'<td class="lb-pts-cell">{entry["total_points"]} pts</td>'
+            f'</tr>'
+        )
 
-        if rank == 1:
-            medal = "🥇"
-        elif rank == 2:
-            medal = "🥈"
-        elif rank == 3:
-            medal = "🥉"
-        else:
-            medal = f"  {rank}."
-
-        cols = st.columns([1, 3, 2, 2])
-        cols[0].write(medal)
-        name = f"**{entry['username']}** 👈" if is_me else entry["username"]
-        cols[1].write(name)
-        cols[2].write(f"**{entry['total_points']}** pts")
-        cols[3].write(f"{entry['exact_count']} exato(s)")
-
-        if is_me:
-            st.markdown(
-                '<hr style="border:1px solid #f0c040; margin:0;">',
-                unsafe_allow_html=True,
-            )
+    st.markdown(
+        f'<table class="lb-table">'
+        f'<thead><tr><th></th><th>Jogador</th><th>Exatos</th><th>Pontos</th></tr></thead>'
+        f'<tbody>{rows_html}</tbody></table>',
+        unsafe_allow_html=True,
+    )
 
 
 # ─── Page: Admin ──────────────────────────────────────────────────────────────
