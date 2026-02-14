@@ -6,6 +6,8 @@ Main Streamlit application.
 import streamlit as st
 from datetime import datetime, timedelta
 
+import pandas as pd
+
 import db
 import auth
 
@@ -173,9 +175,11 @@ def widget_upcoming_matches():
         st.caption("Nenhuma partida nos próximos 7 dias.")
         return
 
-    # Load odds for these matches
+    # Load odds and logos for these matches
     match_ids = [m["id"] for m in soon]
     odds_map = db.get_odds_for_matches(match_ids)
+    all_teams = list({m["home_team"] for m in soon} | {m["away_team"] for m in soon})
+    logos = db.get_team_logos(all_teams)
 
     by_league: dict[str, list] = {}
     for m in soon:
@@ -191,9 +195,11 @@ def widget_upcoming_matches():
             day_name = _weekday_pt(match_dt)
             date_str = match_dt.strftime(f"%d/%m ({day_name}) %H:%M")
             odds = odds_map.get(m["id"])
+            home_html = _team_html(m["home_team"], logos)
+            away_html = _team_html(m["away_team"], logos)
             st.markdown(
                 f'<div class="match-card {css_class}">'
-                f'<div><span class="mc-teams">{m["home_team"]} x {m["away_team"]}</span>'
+                f'<div><span class="mc-teams">{home_html} x {away_html}</span>'
                 f'{_odds_html(odds)}</div>'
                 f'<span class="mc-meta">R{m["round_number"] or "?"} &middot; {date_str}</span>'
                 f'</div>',
@@ -214,6 +220,22 @@ def _odds_html(odds: dict | None) -> str:
         f'<span class="odds-source">{odds.get("bookmaker", "")}</span>'
         f'</div>'
     )
+
+
+def _team_html(name: str, logos: dict[str, str], size: int = 22) -> str:
+    """Return team name with optional crest image."""
+    logo = logos.get(name, "")
+    if logo:
+        return f'<img src="{logo}" width="{size}" height="{size}" style="vertical-align:middle;margin-right:4px">{name}'
+    return name
+
+
+def _team_md(name: str, logos: dict[str, str], size: int = 22) -> str:
+    """Return markdown-safe team name with optional crest image (for st.markdown)."""
+    logo = logos.get(name, "")
+    if logo:
+        return f'<img src="{logo}" width="{size}" height="{size}" style="vertical-align:middle;margin-right:4px"> **{name}**'
+    return f"**{name}**"
 
 
 def _weekday_pt(dt: datetime) -> str:
@@ -298,9 +320,11 @@ def widget_upcoming_bets():
 
     user_bets = db.get_user_bets(user["id"])
 
-    # Load odds for these matches
+    # Load odds and logos for these matches
     match_ids = [m["id"] for m in soon]
     odds_map = db.get_odds_for_matches(match_ids)
+    all_teams = list({m["home_team"] for m in soon} | {m["away_team"] for m in soon})
+    logos = db.get_team_logos(all_teams)
 
     # Group by league
     by_league: dict[str, list] = {}
@@ -326,9 +350,11 @@ def widget_upcoming_bets():
                 else:
                     score_txt = "- x -"
                 odds = odds_map.get(m["id"])
+                home_html = _team_html(m["home_team"], logos)
+                away_html = _team_html(m["away_team"], logos)
                 st.markdown(
                     f'<div class="match-card {css_class} locked">'
-                    f'<div><span class="mc-teams">🔒 {m["home_team"]} {score_txt} {m["away_team"]}</span>'
+                    f'<div><span class="mc-teams">🔒 {home_html} {score_txt} {away_html}</span>'
                     f'{_odds_html(odds)}</div>'
                     f'<span class="mc-meta">{date_str}</span>'
                     f'</div>',
@@ -341,7 +367,7 @@ def widget_upcoming_bets():
                     if odds:
                         st.markdown(_odds_html(odds), unsafe_allow_html=True)
                     cols = st.columns([3, 1, 0.5, 1, 3])
-                    cols[0].markdown(f"**{m['home_team']}**")
+                    cols[0].markdown(_team_md(m['home_team'], logos), unsafe_allow_html=True)
                     home_val = existing["home_score"] if existing else 0
                     away_val = existing["away_score"] if existing else 0
                     home_score = cols[1].number_input(
@@ -356,7 +382,7 @@ def widget_upcoming_bets():
                         "A", min_value=0, max_value=20, value=away_val,
                         label_visibility="collapsed", key=f"ab_{m['id']}"
                     )
-                    cols[4].markdown(f"**{m['away_team']}**")
+                    cols[4].markdown(_team_md(m['away_team'], logos), unsafe_allow_html=True)
 
                     col_btn, col_status = st.columns([1, 1])
                     submitted = col_btn.form_submit_button("Salvar", use_container_width=True)
@@ -470,9 +496,11 @@ def page_bets():
         st.info("Nenhuma partida disponível no momento. Aguarde o admin cadastrar os jogos.")
         return
 
-    # Load odds for all matches
+    # Load odds and logos for all matches
     all_match_ids = [m["id"] for m in matches]
     odds_map = db.get_odds_for_matches(all_match_ids)
+    all_teams = list({m["home_team"] for m in matches} | {m["away_team"] for m in matches})
+    logos = db.get_team_logos(all_teams)
 
     now = datetime.now()
 
@@ -498,7 +526,7 @@ def page_bets():
                 league_tag = m.get("league", "")
 
                 cols = st.columns([3, 1, 0.5, 1, 3])
-                cols[0].write(f"**{m['home_team']}**")
+                cols[0].markdown(_team_md(m['home_team'], logos), unsafe_allow_html=True)
                 if existing:
                     cols[1].write(f"**{existing['home_score']}**")
                     cols[2].write("x")
@@ -507,7 +535,7 @@ def page_bets():
                     cols[1].write("-")
                     cols[2].write("x")
                     cols[3].write("-")
-                cols[4].write(f"**{m['away_team']}**")
+                cols[4].markdown(_team_md(m['away_team'], logos), unsafe_allow_html=True)
                 pts_str = ""
                 if existing and existing.get("points_awarded") is not None:
                     pts_str = f" · **{existing['points_awarded']} pts**"
@@ -538,7 +566,7 @@ def page_bets():
                     if odds:
                         st.markdown(_odds_html(odds), unsafe_allow_html=True)
                     cols = st.columns([3, 1, 1, 1, 3])
-                    cols[0].markdown(f"**{m['home_team']}**")
+                    cols[0].markdown(_team_md(m['home_team'], logos), unsafe_allow_html=True)
                     home_val = existing["home_score"] if existing else 0
                     away_val = existing["away_score"] if existing else 0
                     home_score = cols[1].number_input(
@@ -550,7 +578,7 @@ def page_bets():
                         "A", min_value=0, max_value=20, value=away_val,
                         label_visibility="collapsed", key=f"a_{m['id']}"
                     )
-                    cols[4].markdown(f"**{m['away_team']}**")
+                    cols[4].markdown(_team_md(m['away_team'], logos), unsafe_allow_html=True)
 
                     col_btn, col_status = st.columns([1, 1])
                     submitted = col_btn.form_submit_button("Salvar", use_container_width=True)
@@ -621,6 +649,34 @@ def page_leaderboard():
         f'<tbody>{rows_html}</tbody></table>',
         unsafe_allow_html=True,
     )
+
+    # ── Leaderboard Evolution Chart ──
+    evolution = db.get_leaderboard_evolution()
+    if evolution:
+        # Get top 5 player names from current leaderboard
+        top5_names = [e["username"] for e in leaderboard[:5]]
+
+        # Build cumulative points per player over time
+        records = []
+        cumulative = {name: 0 for name in top5_names}
+        # Group by match_time to accumulate
+        from itertools import groupby
+        for match_time, group in groupby(evolution, key=lambda r: r["match_time"]):
+            for row in group:
+                if row["username"] in cumulative:
+                    cumulative[row["username"]] += row["points_awarded"]
+            records.append({"match_time": match_time, **cumulative.copy()})
+
+        if records:
+            df = pd.DataFrame(records)
+            df["match_time"] = pd.to_datetime(df["match_time"])
+            df = df.set_index("match_time")[top5_names]
+
+            st.markdown(
+                '<div class="section-header"><span>📈 Evolução</span></div>',
+                unsafe_allow_html=True,
+            )
+            st.line_chart(df)
 
 
 # ─── Page: Admin ──────────────────────────────────────────────────────────────

@@ -372,8 +372,31 @@ def place_bot_bets(conn, unfinished):
     print(f"[BOTS] Placed {bets_placed} bot bet(s).")
 
 
+def store_team_crests(conn, api_matches: list[dict], team_map: dict):
+    """Extract crest URLs from API match objects and upsert into teams table."""
+    for match in api_matches:
+        for side in ("homeTeam", "awayTeam"):
+            team = match.get(side, {})
+            short_name = team.get("shortName", "")
+            crest_url = team.get("crest", "")
+            db_name = team_map.get(short_name)
+            if db_name and crest_url:
+                conn.execute(
+                    """INSERT INTO teams (name, logo_url)
+                       VALUES (?, ?)
+                       ON CONFLICT(name) DO UPDATE SET logo_url = excluded.logo_url
+                    """,
+                    (db_name, crest_url),
+                )
+
+
 def main():
     conn = libsql.connect(TURSO_URL, auth_token=TURSO_AUTH_TOKEN)
+
+    # Ensure teams table exists
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS teams (name TEXT PRIMARY KEY, logo_url TEXT)"
+    )
 
     today = datetime.utcnow().date()
     # For finished matches: look back 3 days
@@ -520,6 +543,11 @@ def main():
 
         if scheduled:
             print(f"[{comp_code}] Checked {len(scheduled)} upcoming matches for time changes")
+
+        # ── Store team crests from API responses ──────────────────────────
+        all_api_matches = finished + scheduled
+        store_team_crests(conn, all_api_matches, team_map)
+        print(f"[{comp_code}] Stored crests for {len(all_api_matches)} API match(es)")
 
     # ── 3. Fetch betting odds ──────────────────────────────────────────
     # Re-fetch unfinished matches (some may have been marked finished above)

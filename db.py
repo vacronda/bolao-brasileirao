@@ -172,6 +172,10 @@ def init_db():
                 updated_at TEXT DEFAULT (datetime('now')),
                 FOREIGN KEY (match_id) REFERENCES matches(id)
             )""",
+            """CREATE TABLE IF NOT EXISTS teams (
+                name TEXT PRIMARY KEY,
+                logo_url TEXT
+            )""",
         ]
         for stmt in statements:
             conn.execute(stmt)
@@ -513,6 +517,48 @@ def admin_delete_bet(bet_id: int):
     """Delete a specific bet by ID."""
     with get_conn() as conn:
         conn.execute("DELETE FROM bets WHERE id = ?", (bet_id,))
+
+
+# ─── Team operations ──────────────────────────────────────────────────────────
+
+def upsert_team(name: str, logo_url: str):
+    with get_conn() as conn:
+        conn.execute(
+            """INSERT INTO teams (name, logo_url)
+               VALUES (?, ?)
+               ON CONFLICT(name) DO UPDATE SET logo_url = excluded.logo_url
+            """,
+            (name, logo_url),
+        )
+
+
+def get_team_logos(team_names: list[str]) -> dict[str, str]:
+    """Returns {name: logo_url} for given team names."""
+    if not team_names:
+        return {}
+    with get_conn() as conn:
+        placeholders = ",".join("?" for _ in team_names)
+        rows = _to_dicts(
+            conn.execute(
+                f"SELECT name, logo_url FROM teams WHERE name IN ({placeholders})",
+                tuple(team_names),
+            ).fetchall()
+        )
+        return {r["name"]: r["logo_url"] for r in rows if r.get("logo_url")}
+
+
+def get_leaderboard_evolution() -> list[dict]:
+    """Returns rows of (username, match_time, points_awarded) for finished matches."""
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT u.username, m.match_time, COALESCE(b.points_awarded, 0) as points_awarded
+            FROM bets b
+            JOIN users u ON u.id = b.user_id
+            JOIN matches m ON m.id = b.match_id
+            WHERE m.is_finished = 1 AND u.is_admin = 0
+            ORDER BY m.match_time ASC
+        """).fetchall()
+        return _to_dicts(rows)
 
 
 def recalculate_all_points():
