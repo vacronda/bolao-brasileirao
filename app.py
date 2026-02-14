@@ -222,23 +222,8 @@ def page_home():
             unsafe_allow_html=True,
         )
 
-    # ── Upcoming matches ──
-    st.markdown(
-        '<div class="section-header"><span>📅 Próximos Jogos (7 dias)</span></div>',
-        unsafe_allow_html=True,
-    )
-    widget_upcoming_matches()
-
-    # ── Leaderboard ──
-    st.markdown(
-        '<div class="section-header"><span>🏆 Classificação</span></div>',
-        unsafe_allow_html=True,
-    )
-    widget_leaderboard_mini()
-
     # ── Login / Register (only if not logged in) ──
     if not auth.is_logged_in():
-        st.markdown("---")
         st.markdown(
             '<div class="section-header"><span>🔑 Entrar ou Criar Conta</span></div>',
             unsafe_allow_html=True,
@@ -284,6 +269,20 @@ def page_home():
                             st.success("Conta criada! Faça login.")
                         else:
                             st.error("Usuário já existe.")
+
+    # ── Leaderboard ──
+    st.markdown(
+        '<div class="section-header"><span>🏆 Classificação</span></div>',
+        unsafe_allow_html=True,
+    )
+    widget_leaderboard_mini()
+
+    # ── Upcoming matches ──
+    st.markdown(
+        '<div class="section-header"><span>📅 Próximos Jogos (7 dias)</span></div>',
+        unsafe_allow_html=True,
+    )
+    widget_upcoming_matches()
 
 
 # ─── Page: My Bets ────────────────────────────────────────────────────────────
