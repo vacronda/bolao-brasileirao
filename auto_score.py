@@ -121,11 +121,20 @@ def main():
         print("No unfinished matches in DB.")
         return
 
-    # Build lookup: (league, home_team, away_team) -> match row
+    # Build lookup: (league, round, home_team, away_team) -> match row
+    # Also keep a fallback by (league, home_team, away_team) for unique matchups
     db_lookup = {}
+    db_lookup_no_round = {}
     for m in unfinished:
-        key = (m["league"], m["home_team"], m["away_team"])
+        rnd = m.get("round_number")
+        key = (m["league"], rnd, m["home_team"], m["away_team"])
         db_lookup[key] = m
+        team_key = (m["league"], m["home_team"], m["away_team"])
+        # Only use fallback if the matchup is unique (no duplicate home/away)
+        if team_key in db_lookup_no_round:
+            db_lookup_no_round[team_key] = None  # mark ambiguous
+        else:
+            db_lookup_no_round[team_key] = m
 
     updated = 0
     times_updated = 0
@@ -149,6 +158,7 @@ def main():
             api_away = match["awayTeam"]["shortName"]
             home_name = team_map.get(api_home, api_home)
             away_name = team_map.get(api_away, api_away)
+            matchday = match.get("matchday")
 
             ft = match.get("score", {}).get("fullTime", {})
             home_score = ft.get("home")
@@ -157,8 +167,12 @@ def main():
             if home_score is None or away_score is None:
                 continue
 
-            key = (league_name, home_name, away_name)
-            db_match = db_lookup.get(key)
+            # Try round-specific lookup first, then unique fallback
+            db_match = db_lookup.get((league_name, matchday, home_name, away_name))
+            if not db_match:
+                fb = db_lookup_no_round.get((league_name, home_name, away_name))
+                if fb is not None:
+                    db_match = fb
 
             if not db_match:
                 continue
@@ -200,9 +214,14 @@ def main():
             api_away = match["awayTeam"]["shortName"]
             home_name = team_map.get(api_home, api_home)
             away_name = team_map.get(api_away, api_away)
+            matchday = match.get("matchday")
 
-            key = (league_name, home_name, away_name)
-            db_match = db_lookup.get(key)
+            # Try round-specific lookup first, then unique fallback
+            db_match = db_lookup.get((league_name, matchday, home_name, away_name))
+            if not db_match:
+                fb = db_lookup_no_round.get((league_name, home_name, away_name))
+                if fb is not None:
+                    db_match = fb
 
             if not db_match:
                 continue
