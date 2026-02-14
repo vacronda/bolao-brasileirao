@@ -396,6 +396,31 @@ def page_bets():
         open_matches = [m for m in open_matches if m.get("league", "Brasileirão") == selected_league]
         locked_matches = [m for m in locked_matches if m.get("league", "Brasileirão") == selected_league]
 
+    # ── Locked matches (already started, collapsed) ──
+    if locked_matches:
+        with st.expander(f"🔒 Jogos já iniciados ({len(locked_matches)})"):
+            for m in locked_matches:
+                match_dt = datetime.fromisoformat(m["match_time"])
+                existing = user_bets.get(m["id"])
+                date_str = match_dt.strftime("%d/%m %H:%M")
+                league_tag = m.get("league", "")
+
+                cols = st.columns([3, 1, 0.5, 1, 3])
+                cols[0].write(f"**{m['home_team']}**")
+                if existing:
+                    cols[1].write(f"**{existing['home_score']}**")
+                    cols[2].write("x")
+                    cols[3].write(f"**{existing['away_score']}**")
+                else:
+                    cols[1].write("-")
+                    cols[2].write("x")
+                    cols[3].write("-")
+                cols[4].write(f"**{m['away_team']}**")
+                pts_str = ""
+                if existing and existing.get("points_awarded") is not None:
+                    pts_str = f" · **{existing['points_awarded']} pts**"
+                st.caption(f"[{league_tag}] R{m['round_number'] or '?'} · {date_str}{pts_str}")
+
     # ── Open matches (bettable) ──
     if not open_matches:
         st.info("Nenhuma partida aberta para palpites no momento.")
@@ -445,31 +470,6 @@ def page_bets():
                             st.error("Não foi possível salvar. A partida pode já ter começado.")
 
             st.divider()
-
-    # ── Locked matches (already started, collapsed) ──
-    if locked_matches:
-        with st.expander(f"🔒 Jogos já iniciados ({len(locked_matches)})"):
-            for m in locked_matches:
-                match_dt = datetime.fromisoformat(m["match_time"])
-                existing = user_bets.get(m["id"])
-                date_str = match_dt.strftime("%d/%m %H:%M")
-                league_tag = m.get("league", "")
-
-                cols = st.columns([3, 1, 0.5, 1, 3])
-                cols[0].write(f"**{m['home_team']}**")
-                if existing:
-                    cols[1].write(f"**{existing['home_score']}**")
-                    cols[2].write("x")
-                    cols[3].write(f"**{existing['away_score']}**")
-                else:
-                    cols[1].write("-")
-                    cols[2].write("x")
-                    cols[3].write("-")
-                cols[4].write(f"**{m['away_team']}**")
-                pts_str = ""
-                if existing and existing.get("points_awarded") is not None:
-                    pts_str = f" · **{existing['points_awarded']} pts**"
-                st.caption(f"[{league_tag}] R{m['round_number'] or '?'} · {date_str}{pts_str}")
 
 
 # ─── Page: Leaderboard ────────────────────────────────────────────────────────
