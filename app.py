@@ -113,6 +113,22 @@ st.markdown("""
     }
     .rule-chip .pts { font-size: 1.3rem; font-weight: 800; color: #00a86b; }
     .rule-chip .label { font-size: 0.72rem; color: #666; margin-top: 2px; }
+
+    /* ── Odds display ────────────────────────────────────────────── */
+    .odds-row {
+        display: flex; align-items: center; justify-content: center; gap: 6px;
+        margin-top: 4px;
+    }
+    .odds-badge {
+        background: #f0f2f5; border-radius: 5px; padding: 2px 8px;
+        font-size: 0.72rem; font-weight: 600; color: #555;
+        text-align: center; min-width: 40px;
+    }
+    .odds-badge.home { color: #1a7f4b; background: #e6f5ed; }
+    .odds-badge.draw { color: #7a6b00; background: #fef9e7; }
+    .odds-badge.away { color: #6b1a1a; background: #fce8e8; }
+    .odds-label { font-size: 0.62rem; color: #999; font-weight: 500; }
+    .odds-source { font-size: 0.58rem; color: #bbb; margin-left: 4px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -156,6 +172,10 @@ def widget_upcoming_matches():
         st.caption("Nenhuma partida nos próximos 7 dias.")
         return
 
+    # Load odds for these matches
+    match_ids = [m["id"] for m in soon]
+    odds_map = db.get_odds_for_matches(match_ids)
+
     by_league: dict[str, list] = {}
     for m in soon:
         lg = m.get("league", "Brasileirão")
@@ -169,13 +189,30 @@ def widget_upcoming_matches():
             match_dt = datetime.fromisoformat(m["match_time"])
             day_name = _weekday_pt(match_dt)
             date_str = match_dt.strftime(f"%d/%m ({day_name}) %H:%M")
+            odds = odds_map.get(m["id"])
             st.markdown(
                 f'<div class="match-card {css_class}">'
-                f'<span class="mc-teams">{m["home_team"]} x {m["away_team"]}</span>'
+                f'<div><span class="mc-teams">{m["home_team"]} x {m["away_team"]}</span>'
+                f'{_odds_html(odds)}</div>'
                 f'<span class="mc-meta">R{m["round_number"] or "?"} &middot; {date_str}</span>'
                 f'</div>',
                 unsafe_allow_html=True,
             )
+
+
+def _odds_html(odds: dict | None) -> str:
+    """Return HTML for odds display, or empty string if no odds."""
+    if not odds:
+        return ""
+    return (
+        f'<div class="odds-row">'
+        f'<span class="odds-label">Odds:</span>'
+        f'<span class="odds-badge home">{odds["home_win"]:.2f}</span>'
+        f'<span class="odds-badge draw">{odds["draw"]:.2f}</span>'
+        f'<span class="odds-badge away">{odds["away_win"]:.2f}</span>'
+        f'<span class="odds-source">{odds.get("bookmaker", "")}</span>'
+        f'</div>'
+    )
 
 
 def _weekday_pt(dt: datetime) -> str:
@@ -252,6 +289,10 @@ def widget_upcoming_bets():
 
     user_bets = db.get_user_bets(user["id"])
 
+    # Load odds for these matches
+    match_ids = [m["id"] for m in soon]
+    odds_map = db.get_odds_for_matches(match_ids)
+
     # Group by league
     by_league: dict[str, list] = {}
     for m in soon:
@@ -275,16 +316,21 @@ def widget_upcoming_bets():
                     score_txt = f"{existing['home_score']} x {existing['away_score']}"
                 else:
                     score_txt = "- x -"
+                odds = odds_map.get(m["id"])
                 st.markdown(
                     f'<div class="match-card {css_class} locked">'
-                    f'<span class="mc-teams">🔒 {m["home_team"]} {score_txt} {m["away_team"]}</span>'
+                    f'<div><span class="mc-teams">🔒 {m["home_team"]} {score_txt} {m["away_team"]}</span>'
+                    f'{_odds_html(odds)}</div>'
                     f'<span class="mc-meta">{date_str}</span>'
                     f'</div>',
                     unsafe_allow_html=True,
                 )
             else:
+                odds = odds_map.get(m["id"])
                 with st.form(key=f"home_bet_{m['id']}"):
                     st.caption(f"R{m['round_number'] or '?'} · {date_str}")
+                    if odds:
+                        st.markdown(_odds_html(odds), unsafe_allow_html=True)
                     cols = st.columns([3, 1, 0.5, 1, 3])
                     cols[0].markdown(f"**{m['home_team']}**")
                     home_val = existing["home_score"] if existing else 0
@@ -415,6 +461,10 @@ def page_bets():
         st.info("Nenhuma partida disponível no momento. Aguarde o admin cadastrar os jogos.")
         return
 
+    # Load odds for all matches
+    all_match_ids = [m["id"] for m in matches]
+    odds_map = db.get_odds_for_matches(all_match_ids)
+
     now = datetime.now()
 
     # Split into open (bettable) and locked (already started)
@@ -472,9 +522,12 @@ def page_bets():
                 match_dt = datetime.fromisoformat(m["match_time"])
                 existing = user_bets.get(m["id"])
                 date_str = match_dt.strftime("%d/%m %H:%M")
+                odds = odds_map.get(m["id"])
 
                 with st.form(key=f"bet_{m['id']}"):
                     st.markdown(f"**{date_str}**")
+                    if odds:
+                        st.markdown(_odds_html(odds), unsafe_allow_html=True)
                     cols = st.columns([3, 1, 1, 1, 3])
                     cols[0].markdown(f"**{m['home_team']}**")
                     home_val = existing["home_score"] if existing else 0

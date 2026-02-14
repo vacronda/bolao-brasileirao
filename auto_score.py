@@ -1,9 +1,10 @@
 """
-Auto-scoring script: fetches real match results from football-data.org
-and updates the Turso database. Designed to run via GitHub Actions cron.
+Auto-scoring script: fetches real match results from football-data.org,
+syncs kick-off times, and fetches betting odds from The Odds API.
+Designed to run via GitHub Actions cron.
 
 Usage: python auto_score.py
-Env vars: TURSO_URL, TURSO_AUTH_TOKEN, FOOTBALL_API_KEY
+Env vars: TURSO_URL, TURSO_AUTH_TOKEN, FOOTBALL_API_KEY, ODDS_API_KEY (optional)
 """
 
 import os
@@ -18,7 +19,9 @@ import libsql_experimental as libsql
 TURSO_URL = os.environ["TURSO_URL"]
 TURSO_AUTH_TOKEN = os.environ["TURSO_AUTH_TOKEN"]
 FOOTBALL_API_KEY = os.environ["FOOTBALL_API_KEY"]
+ODDS_API_KEY = os.environ.get("ODDS_API_KEY", "")
 API_BASE = "https://api.football-data.org/v4"
+ODDS_API_BASE = "https://api.the-odds-api.com/v4"
 
 # Map from football-data.org shortName → our DB team name
 TEAM_MAP_PL = {
@@ -67,6 +70,60 @@ TEAM_MAP_BSA = {
     "Santos": "Santos",
 }
 
+# Map from The Odds API team names → our DB team names
+ODDS_TEAM_MAP_PL = {
+    "Arsenal": "Arsenal",
+    "Aston Villa": "Aston Villa",
+    "Chelsea": "Chelsea",
+    "Everton": "Everton",
+    "Fulham": "Fulham",
+    "Liverpool": "Liverpool",
+    "Manchester City": "Man City",
+    "Manchester United": "Man Utd",
+    "Newcastle United": "Newcastle",
+    "Sunderland": "Sunderland",
+    "Tottenham Hotspur": "Spurs",
+    "Wolverhampton Wanderers": "Wolves",
+    "Burnley": "Burnley",
+    "Leeds United": "Leeds",
+    "Nottingham Forest": "Nottingham Forest",
+    "Crystal Palace": "Crystal Palace",
+    "Brighton and Hove Albion": "Brighton",
+    "Brentford": "Brentford",
+    "West Ham United": "West Ham",
+    "AFC Bournemouth": "Bournemouth",
+    "Ipswich Town": "Ipswich",
+    "Leicester City": "Leicester",
+    "Southampton": "Southampton",
+}
+
+ODDS_TEAM_MAP_BSA = {
+    "Fluminense": "Fluminense",
+    "Atletico Mineiro": "Atlético-MG",
+    "Gremio": "Grêmio",
+    "Athletico Paranaense": "Athletico-PR",
+    "Palmeiras": "Palmeiras",
+    "Botafogo": "Botafogo",
+    "Cruzeiro": "Cruzeiro",
+    "Chapecoense": "Chapecoense",
+    "Sao Paulo": "São Paulo",
+    "Bahia": "Bahia",
+    "Corinthians": "Corinthians",
+    "Vasco da Gama": "Vasco",
+    "Vitoria": "Vitória",
+    "Flamengo": "Flamengo",
+    "Coritiba": "Coritiba",
+    "Red Bull Bragantino": "Red Bull Bragantino",
+    "Mirassol": "Mirassol",
+    "Internacional": "Internacional",
+    "Santos": "Santos",
+    "Sport Recife": "Sport",
+    "Ceara": "Ceará",
+    "Fortaleza EC": "Fortaleza",
+    "Juventude": "Juventude",
+    "Goias": "Goiás",
+}
+
 
 def api_get(path: str) -> dict:
     url = f"{API_BASE}{path}"
@@ -95,6 +152,95 @@ def score_bet(pred_h, pred_a, real_h, real_a, config):
     if pred_out == 0 and real_out == 0:
         return config["correct_draw"]
     return config["wrong"]
+
+
+def odds_api_get(sport_key: str) -> list[dict]:
+    """Fetch odds from The Odds API for a given sport."""
+    url = (
+        f"{ODDS_API_BASE}/sports/{sport_key}/odds/"
+        f"?apiKey={ODDS_API_KEY}&regions=eu&markets=h2h&oddsFormat=decimal"
+    )
+    req = urllib.request.Request(url)
+    with urllib.request.urlopen(req) as resp:
+        return json.loads(resp.read().decode())
+
+
+def fetch_and_store_odds(conn, unfinished):
+    """Fetch odds from The Odds API and store them in match_odds table."""
+    if not ODDS_API_KEY:
+        print("[ODDS] No ODDS_API_KEY set, skipping odds fetch.")
+        return
+
+    # Build lookup: (league, home_team, away_team) -> match row
+    db_lookup = {}
+    for m in unfinished:
+        key = (m["league"], m["home_team"], m["away_team"])
+        db_lookup[key] = m
+
+    odds_updated = 0
+
+    for sport_key, league_name, team_map in [
+        ("soccer_epl", "Premier League", ODDS_TEAM_MAP_PL),
+        ("soccer_brazil_campeonato", "Brasileirão", ODDS_TEAM_MAP_BSA),
+    ]:
+        try:
+            events = odds_api_get(sport_key)
+        except Exception as e:
+            print(f"[ODDS] Error fetching {sport_key}: {e}")
+            continue
+
+        print(f"[ODDS] {sport_key}: {len(events)} events from API")
+
+        for event in events:
+            api_home = event.get("home_team", "")
+            api_away = event.get("away_team", "")
+            home_name = team_map.get(api_home, api_home)
+            away_name = team_map.get(api_away, api_away)
+
+            db_match = db_lookup.get((league_name, home_name, away_name))
+            if not db_match:
+                continue
+
+            # Get the first bookmaker's h2h odds
+            bookmakers = event.get("bookmakers", [])
+            if not bookmakers:
+                continue
+
+            bk = bookmakers[0]
+            bookmaker_name = bk.get("title", "Unknown")
+            h2h_market = None
+            for market in bk.get("markets", []):
+                if market.get("key") == "h2h":
+                    h2h_market = market
+                    break
+
+            if not h2h_market:
+                continue
+
+            outcomes = {o["name"]: o["price"] for o in h2h_market.get("outcomes", [])}
+            home_win = outcomes.get(api_home)
+            draw_odds = outcomes.get("Draw")
+            away_win = outcomes.get(api_away)
+
+            if home_win is None or draw_odds is None or away_win is None:
+                continue
+
+            conn.execute(
+                """INSERT INTO match_odds (match_id, home_win, draw, away_win, bookmaker, updated_at)
+                   VALUES (?, ?, ?, ?, ?, datetime('now'))
+                   ON CONFLICT(match_id) DO UPDATE SET
+                       home_win = excluded.home_win,
+                       draw = excluded.draw,
+                       away_win = excluded.away_win,
+                       bookmaker = excluded.bookmaker,
+                       updated_at = datetime('now')
+                """,
+                (db_match["id"], home_win, draw_odds, away_win, bookmaker_name),
+            )
+            odds_updated += 1
+            print(f"  📊 {home_name} vs {away_name}: {home_win} | {draw_odds} | {away_win} ({bookmaker_name})")
+
+    print(f"[ODDS] Updated odds for {odds_updated} match(es).")
 
 
 def main():
@@ -245,6 +391,13 @@ def main():
 
         if scheduled:
             print(f"[{comp_code}] Checked {len(scheduled)} upcoming matches for time changes")
+
+    # ── 3. Fetch betting odds ──────────────────────────────────────────
+    # Re-fetch unfinished matches (some may have been marked finished above)
+    cur2 = conn.execute("SELECT * FROM matches WHERE is_finished = 0")
+    db_cols2 = [d[0] for d in cur2.description]
+    still_unfinished = [dict(zip(db_cols2, r)) for r in cur2.fetchall()]
+    fetch_and_store_odds(conn, still_unfinished)
 
     conn.commit()
     print(f"\nDone. Updated {updated} result(s), {times_updated} match time(s).")

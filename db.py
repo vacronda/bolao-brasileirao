@@ -163,6 +163,15 @@ def init_db():
                 correct_draw INTEGER DEFAULT 3,
                 wrong INTEGER DEFAULT 0
             )""",
+            """CREATE TABLE IF NOT EXISTS match_odds (
+                match_id INTEGER PRIMARY KEY,
+                home_win REAL,
+                draw REAL,
+                away_win REAL,
+                bookmaker TEXT,
+                updated_at TEXT DEFAULT (datetime('now')),
+                FOREIGN KEY (match_id) REFERENCES matches(id)
+            )""",
         ]
         for stmt in statements:
             conn.execute(stmt)
@@ -422,6 +431,39 @@ def update_scoring_config(
                WHERE id = 1""",
             (exact_score, correct_winner_goal_diff, correct_winner, correct_draw, wrong),
         )
+
+
+# ─── Odds operations ─────────────────────────────────────────────────────────
+
+def upsert_odds(match_id: int, home_win: float, draw: float, away_win: float, bookmaker: str):
+    with get_conn() as conn:
+        conn.execute(
+            """INSERT INTO match_odds (match_id, home_win, draw, away_win, bookmaker, updated_at)
+               VALUES (?, ?, ?, ?, ?, datetime('now'))
+               ON CONFLICT(match_id) DO UPDATE SET
+                   home_win = excluded.home_win,
+                   draw = excluded.draw,
+                   away_win = excluded.away_win,
+                   bookmaker = excluded.bookmaker,
+                   updated_at = datetime('now')
+            """,
+            (match_id, home_win, draw, away_win, bookmaker),
+        )
+
+
+def get_odds_for_matches(match_ids: list[int]) -> dict[int, dict]:
+    """Returns {match_id: {home_win, draw, away_win, bookmaker}} for given match IDs."""
+    if not match_ids:
+        return {}
+    with get_conn() as conn:
+        placeholders = ",".join("?" for _ in match_ids)
+        rows = _to_dicts(
+            conn.execute(
+                f"SELECT * FROM match_odds WHERE match_id IN ({placeholders})",
+                tuple(match_ids),
+            ).fetchall()
+        )
+        return {r["match_id"]: r for r in rows}
 
 
 def recalculate_all_points():
