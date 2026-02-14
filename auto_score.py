@@ -75,8 +75,8 @@ def api_get(path: str) -> dict:
         return json.loads(resp.read().decode())
 
 
-def get_finished_matches(competition: str, date_from: str, date_to: str) -> list[dict]:
-    path = f"/competitions/{competition}/matches?status=FINISHED&dateFrom={date_from}&dateTo={date_to}"
+def get_matches_by_status(competition: str, status: str, date_from: str, date_to: str) -> list[dict]:
+    path = f"/competitions/{competition}/matches?status={status}&dateFrom={date_from}&dateTo={date_to}"
     data = api_get(path)
     return data.get("matches", [])
 
@@ -100,10 +100,12 @@ def score_bet(pred_h, pred_a, real_h, real_a, config):
 def main():
     conn = libsql.connect(TURSO_URL, auth_token=TURSO_AUTH_TOKEN)
 
-    # Date range: last 3 days
     today = datetime.utcnow().date()
-    date_from = (today - timedelta(days=3)).isoformat()
-    date_to = today.isoformat()
+    # For finished matches: look back 3 days
+    date_from_finished = (today - timedelta(days=3)).isoformat()
+    # For scheduled matches: look ahead 30 days
+    date_to_scheduled = (today + timedelta(days=30)).isoformat()
+    date_today = today.isoformat()
 
     # Get scoring config
     row = conn.execute("SELECT * FROM scoring_config WHERE id = 1").fetchone()
@@ -126,17 +128,19 @@ def main():
         db_lookup[key] = m
 
     updated = 0
+    times_updated = 0
 
     # Process each competition
     for comp_code, league_name, team_map in [
         ("PL", "Premier League", TEAM_MAP_PL),
         ("BSA", "Brasileirão", TEAM_MAP_BSA),
     ]:
+        # ── 1. Score finished matches ──────────────────────────────────────
         try:
-            finished = get_finished_matches(comp_code, date_from, date_to)
+            finished = get_matches_by_status(comp_code, "FINISHED", date_from_finished, date_today)
         except Exception as e:
-            print(f"Error fetching {comp_code}: {e}")
-            continue
+            print(f"Error fetching finished {comp_code}: {e}")
+            finished = []
 
         print(f"[{comp_code}] Found {len(finished)} finished matches from API")
 
@@ -184,8 +188,47 @@ def main():
             updated += 1
             print(f"  ✓ {home_name} {home_score}-{away_score} {away_name}")
 
+        # ── 2. Sync kick-off times for upcoming matches ────────────────────
+        try:
+            scheduled = get_matches_by_status(comp_code, "SCHEDULED,TIMED", date_today, date_to_scheduled)
+        except Exception as e:
+            print(f"Error fetching scheduled {comp_code}: {e}")
+            scheduled = []
+
+        for match in scheduled:
+            api_home = match["homeTeam"]["shortName"]
+            api_away = match["awayTeam"]["shortName"]
+            home_name = team_map.get(api_home, api_home)
+            away_name = team_map.get(api_away, api_away)
+
+            key = (league_name, home_name, away_name)
+            db_match = db_lookup.get(key)
+
+            if not db_match:
+                continue
+
+            # API returns UTC datetime like "2026-02-18T20:00:00Z"
+            api_time = match.get("utcDate", "")
+            if not api_time:
+                continue
+
+            # Convert to "YYYY-MM-DD HH:MM" format used in our DB
+            new_time = api_time.replace("T", " ").replace("Z", "")[:16]
+            old_time = db_match["match_time"][:16]
+
+            if new_time != old_time:
+                conn.execute(
+                    "UPDATE matches SET match_time = ? WHERE id = ?",
+                    (new_time, db_match["id"]),
+                )
+                times_updated += 1
+                print(f"  🕐 {home_name} vs {away_name}: {old_time} → {new_time}")
+
+        if scheduled:
+            print(f"[{comp_code}] Checked {len(scheduled)} upcoming matches for time changes")
+
     conn.commit()
-    print(f"\nDone. Updated {updated} match(es).")
+    print(f"\nDone. Updated {updated} result(s), {times_updated} match time(s).")
 
 
 if __name__ == "__main__":
