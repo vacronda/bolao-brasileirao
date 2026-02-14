@@ -124,7 +124,8 @@ def widget_upcoming_matches():
     now = datetime.now()
     cutoff = now + timedelta(days=7)
     all_upcoming = db.get_upcoming_matches()
-    soon = [m for m in all_upcoming if datetime.fromisoformat(m["match_time"]) <= cutoff]
+    soon = [m for m in all_upcoming
+            if now < datetime.fromisoformat(m["match_time"]) <= cutoff]
 
     if not soon:
         st.caption("Nenhuma partida nos próximos 7 dias.")
