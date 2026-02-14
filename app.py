@@ -253,6 +253,10 @@ def widget_leaderboard_mini():
             f'<tr class="{row_class}">'
             f'<td class="lb-rank-cell">{medal}</td>'
             f'<td class="lb-name-cell">{entry["username"]}{me_tag}</td>'
+            f'<td class="lb-stat-cell">{entry["total_bets"]}</td>'
+            f'<td class="lb-stat-cell">{entry["exact_count"]}</td>'
+            f'<td class="lb-stat-cell">{entry["zero_count"]}</td>'
+            f'<td class="lb-stat-cell">{entry["missed_count"]}</td>'
             f'<td class="lb-pts-cell">{entry["total_points"]} pts</td>'
             f'</tr>'
         )
@@ -263,13 +267,17 @@ def widget_leaderboard_mini():
             f'<tr class="lb-me" style="border-top:2px dashed #ccc;">'
             f'<td class="lb-rank-cell">{idx+1}.</td>'
             f'<td class="lb-name-cell">{entry["username"]} &#9668;</td>'
+            f'<td class="lb-stat-cell">{entry["total_bets"]}</td>'
+            f'<td class="lb-stat-cell">{entry["exact_count"]}</td>'
+            f'<td class="lb-stat-cell">{entry["zero_count"]}</td>'
+            f'<td class="lb-stat-cell">{entry["missed_count"]}</td>'
             f'<td class="lb-pts-cell">{entry["total_points"]} pts</td>'
             f'</tr>'
         )
 
     st.markdown(
         f'<table class="lb-table">'
-        f'<thead><tr><th></th><th>Jogador</th><th>Pontos</th></tr></thead>'
+        f'<thead><tr><th></th><th>Jogador</th><th>Palpites</th><th>Cravadas</th><th>Zeradas</th><th>Sem palpite</th><th>Pontos</th></tr></thead>'
         f'<tbody>{rows_html}</tbody></table>',
         unsafe_allow_html=True,
     )
