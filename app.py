@@ -632,8 +632,8 @@ def page_admin():
         st.error("Acesso negado.")
         return
 
-    tab_add, tab_results, tab_scoring, tab_manage = st.tabs([
-        "Adicionar Jogos", "Inserir Resultados", "Pontuação", "Gerenciar Jogos"
+    tab_add, tab_results, tab_scoring, tab_manage, tab_bets = st.tabs([
+        "Adicionar Jogos", "Inserir Resultados", "Pontuação", "Gerenciar Jogos", "Palpites"
     ])
 
     LEAGUES = ["Brasileirão", "Premier League"]
@@ -762,6 +762,85 @@ def page_admin():
                 if cols[1].button("🗑️", key=f"del_{m['id']}"):
                     db.delete_match(m["id"])
                     st.rerun()
+
+    # --- View & Manage Bets ---
+    with tab_bets:
+        st.subheader("Palpites dos Jogadores")
+        all_matches = db.get_all_matches()
+        if not all_matches:
+            st.info("Nenhum jogo cadastrado.")
+        else:
+            match_options = {
+                m["id"]: f"[{m.get('league', '')}] {m['home_team']} x {m['away_team']} — "
+                         f"{datetime.fromisoformat(m['match_time']).strftime('%d/%m/%Y %H:%M')}"
+                for m in all_matches
+            }
+            selected_id = st.selectbox(
+                "Selecione o jogo",
+                options=list(match_options.keys()),
+                format_func=lambda x: match_options[x],
+                key="admin_bet_match",
+            )
+
+            if selected_id:
+                bets = db.get_all_bets_for_match(selected_id)
+                if not bets:
+                    st.caption("Nenhum palpite registrado para este jogo.")
+                else:
+                    for bet in bets:
+                        pts = bet["points_awarded"]
+                        pts_str = f" | **{pts} pts**" if pts is not None else ""
+                        with st.form(key=f"admin_edit_bet_{bet['id']}"):
+                            cols = st.columns([2, 1, 0.5, 1, 1, 1])
+                            cols[0].markdown(f"**{bet['username']}**{pts_str}")
+                            new_home = cols[1].number_input(
+                                "H", min_value=0, max_value=20, value=bet["home_score"],
+                                label_visibility="collapsed", key=f"aeh_{bet['id']}",
+                            )
+                            cols[2].markdown(
+                                "<div style='text-align:center;padding-top:8px;font-weight:bold;'>x</div>",
+                                unsafe_allow_html=True,
+                            )
+                            new_away = cols[3].number_input(
+                                "A", min_value=0, max_value=20, value=bet["away_score"],
+                                label_visibility="collapsed", key=f"aea_{bet['id']}",
+                            )
+                            save = cols[4].form_submit_button("💾")
+                            delete = cols[5].form_submit_button("🗑️")
+                            if save:
+                                db.admin_upsert_bet(bet["user_id"], selected_id, int(new_home), int(new_away))
+                                st.rerun()
+                            if delete:
+                                db.admin_delete_bet(bet["id"])
+                                st.rerun()
+
+                # Add new bet for any user
+                st.divider()
+                st.caption("Adicionar palpite")
+                users = db.get_all_users()
+                with st.form("admin_add_bet"):
+                    user_map = {u["id"]: u["username"] for u in users}
+                    sel_user = st.selectbox(
+                        "Jogador",
+                        options=list(user_map.keys()),
+                        format_func=lambda x: user_map[x],
+                        key="admin_new_bet_user",
+                    )
+                    cols = st.columns([1, 0.5, 1])
+                    new_h = cols[0].number_input(
+                        "Casa", min_value=0, max_value=20, value=0, key="admin_new_h"
+                    )
+                    cols[1].markdown(
+                        "<div style='text-align:center;padding-top:28px;font-weight:bold;'>x</div>",
+                        unsafe_allow_html=True,
+                    )
+                    new_a = cols[2].number_input(
+                        "Fora", min_value=0, max_value=20, value=0, key="admin_new_a"
+                    )
+                    if st.form_submit_button("Adicionar Palpite", use_container_width=True):
+                        db.admin_upsert_bet(sel_user, selected_id, int(new_h), int(new_a))
+                        st.success("Palpite adicionado!")
+                        st.rerun()
 
 
 # ─── Router ───────────────────────────────────────────────────────────────────

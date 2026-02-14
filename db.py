@@ -480,6 +480,41 @@ def get_odds_for_matches(match_ids: list[int]) -> dict[int, dict]:
         return {r["match_id"]: r for r in rows}
 
 
+def get_all_bets_for_match(match_id: int) -> list[dict]:
+    """Returns all bets for a match joined with username, ordered by username."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            """SELECT b.id, b.user_id, u.username, b.home_score, b.away_score, b.points_awarded
+               FROM bets b
+               JOIN users u ON u.id = b.user_id
+               WHERE b.match_id = ?
+               ORDER BY u.username""",
+            (match_id,),
+        ).fetchall()
+        return _to_dicts(rows)
+
+
+def admin_upsert_bet(user_id: int, match_id: int, home_score: int, away_score: int):
+    """Insert or update a bet without time/finished checks (admin override)."""
+    with get_conn() as conn:
+        conn.execute(
+            """INSERT INTO bets (user_id, match_id, home_score, away_score, updated_at)
+               VALUES (?, ?, ?, ?, datetime('now'))
+               ON CONFLICT(user_id, match_id) DO UPDATE SET
+                   home_score = excluded.home_score,
+                   away_score = excluded.away_score,
+                   updated_at = datetime('now')
+            """,
+            (user_id, match_id, home_score, away_score),
+        )
+
+
+def admin_delete_bet(bet_id: int):
+    """Delete a specific bet by ID."""
+    with get_conn() as conn:
+        conn.execute("DELETE FROM bets WHERE id = ?", (bet_id,))
+
+
 def recalculate_all_points():
     """Recalculate points for all finished matches (used after scoring config changes)."""
     with get_conn() as conn:
