@@ -186,28 +186,47 @@ st.markdown("""
     [data-testid="stForm"] [data-testid="stVerticalBlockBorderWrapper"] { padding: 0 !important; }
     .compact-row-border { display: none; }
 
-    /* ── Mobile portrait: single row, everything smaller ─────── */
+    /* ── Mobile portrait: force columns to shrink into viewport ── */
     @media (max-width: 600px) {
         .block-container { padding-left: 0.3rem !important; padding-right: 0.3rem !important; }
-        [data-testid="stForm"] { padding: 0.3rem !important; }
+        [data-testid="stForm"] { padding: 0.3rem !important; overflow: hidden !important; }
 
         [data-testid="stForm"] [data-testid="stHorizontalBlock"] {
-            gap: 0.2rem !important;
-            padding: 6px 0 !important;
+            gap: 0.15rem !important;
+            padding: 5px 0 !important;
+            max-width: 100% !important;
+        }
+
+        /* Kill Streamlit's inline width:calc() on ALL columns */
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+            width: auto !important; min-width: 0 !important;
+        }
+        /* Team columns: fill remaining space, truncate with ellipsis */
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1),
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(5) {
+            flex: 1 1 0 !important;
+        }
+        /* Input columns: fixed small size */
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2),
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) {
+            flex: 0 0 2.5rem !important;
+        }
+        /* X column: tiny fixed */
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) {
+            flex: 0 0 1rem !important;
         }
 
         .bet-date { display: none !important; }
         [data-testid="stForm"] .odds-row { display: none !important; }
         .team-name { font-size: 0.72rem; }
-        .team-name img { width: 14px !important; height: 14px !important; margin-right: 3px !important; }
-        [data-testid="stForm"] .stNumberInput > div {
-            max-width: 2.5rem !important;
-        }
+        .team-name img { width: 14px !important; height: 14px !important; margin-right: 2px !important; }
+        [data-testid="stForm"] .stNumberInput,
+        [data-testid="stForm"] .stNumberInput > div,
         [data-testid="stForm"] .stNumberInput > div > div {
-            max-width: 2.5rem !important;
+            min-width: 0 !important; width: auto !important; max-width: 2.5rem !important;
         }
         [data-testid="stForm"] .stNumberInput > div > div > input {
-            font-size: 0.9rem !important; height: 1.6rem !important; width: 2.2rem !important;
+            font-size: 0.85rem !important; height: 1.5rem !important; width: 2.2rem !important;
         }
     }
 </style>
