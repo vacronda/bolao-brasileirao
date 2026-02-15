@@ -133,25 +133,32 @@ st.markdown("""
     .odds-label { font-size: 0.62rem; color: #999; font-weight: 500; }
     .odds-source { font-size: 0.58rem; color: #bbb; margin-left: 4px; }
 
+    /* ── Team name (truncates on overflow) ─────────────────────── */
+    .team-name {
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        display: block; font-size: 0.9rem; line-height: 1.4;
+    }
+    .team-name img { vertical-align: middle; margin-right: 4px; }
+
+    /* ── Date label above team name ────────────────────────────── */
+    .bet-date { font-size: 0.65rem; color: #999; font-weight: 500; display: block; margin-bottom: 1px; }
+
     /* ── Compact betting form rows ──────────────────────────────── */
-    [data-testid="stForm"] [data-testid="stVerticalBlock"] { gap: 0rem !important; }
+    [data-testid="stForm"] [data-testid="stVerticalBlock"] { gap: 0.25rem !important; }
     [data-testid="stForm"] [data-testid="stHorizontalBlock"] {
-        gap: 0.2rem !important;
+        gap: 0.4rem !important;
         flex-wrap: nowrap !important;
         flex-direction: row !important;
         align-items: center !important;
     }
     [data-testid="stForm"] [data-testid="stHorizontalBlock"] [data-testid="column"] {
-        min-width: 0 !important;
-        overflow: hidden;
+        min-width: 0 !important; overflow: hidden;
     }
     [data-testid="stForm"] .stNumberInput { margin-bottom: 0 !important; }
     [data-testid="stForm"] .stNumberInput > div,
-    [data-testid="stForm"] .stNumberInput > div > div {
-        min-width: 0 !important;
-    }
+    [data-testid="stForm"] .stNumberInput > div > div { min-width: 0 !important; }
     [data-testid="stForm"] .stNumberInput > div > div > input {
-        padding: 2px 1px !important; font-size: 0.9rem !important; height: 1.8rem !important;
+        padding: 4px 2px !important; font-size: 1rem !important; height: 2rem !important;
         min-width: 0 !important; width: 100% !important;
         -moz-appearance: textfield !important;
     }
@@ -161,34 +168,43 @@ st.markdown("""
     }
     [data-testid="stForm"] .stNumberInput button { display: none !important; }
     [data-testid="stForm"] .stMarkdown { margin-bottom: 0 !important; }
-    [data-testid="stForm"] .stMarkdown p {
-        font-size: 0.82rem !important; line-height: 1.2 !important;
-        white-space: nowrap !important; overflow: hidden !important;
-        text-overflow: ellipsis !important;
-    }
-    [data-testid="stForm"] .stCaption { margin-bottom: 0 !important; }
-    [data-testid="stForm"] .stCaption p { font-size: 0.65rem !important; line-height: 1.1 !important; }
     [data-testid="stForm"] [data-testid="stVerticalBlockBorderWrapper"] { padding: 0 !important; }
-    .compact-row-border { border-bottom: 1px solid #e8e8e8; padding-bottom: 0; margin-bottom: 0; }
+    .compact-row-border { border-bottom: 1px solid #e8e8e8; padding: 2px 0; margin: 0; }
 
-    /* ── Date label above team name ────────────────────────────── */
-    .bet-date { font-size: 0.65rem; color: #999; font-weight: 500; }
-
-    /* ── Mobile: hide odds & date, shrink everything ──────────── */
-    @media (max-width: 768px) {
+    /* ── Mobile: stack into mini-cards ─────────────────────────── */
+    @media (max-width: 600px) {
         .block-container { padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
-        [data-testid="stForm"] { padding: 0.3rem !important; }
+        [data-testid="stForm"] { padding: 0.4rem !important; }
+
+        /* Let columns wrap into two lines */
         [data-testid="stForm"] [data-testid="stHorizontalBlock"] {
-            gap: 0.15rem !important; max-width: 100% !important;
+            flex-wrap: wrap !important;
+            gap: 0rem 0.3rem !important;
         }
+
+        /* Line 1: team name cols span full width, side by side */
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1),
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(5) {
+            flex: 1 1 45% !important; max-width: 48% !important;
+        }
+
+        /* Line 2: input cols centered */
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2),
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) {
+            flex: 1 1 25% !important; max-width: 30% !important;
+        }
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) {
+            flex: 0 0 auto !important; max-width: 15% !important;
+        }
+
+        .bet-date { display: none !important; }
         [data-testid="stForm"] .odds-row { display: none !important; }
-        [data-testid="stForm"] .bet-date { display: none !important; }
-        [data-testid="stForm"] .stMarkdown img { width: 14px !important; height: 14px !important; }
-        [data-testid="stForm"] .stMarkdown p { font-size: 0.72rem !important; }
+        .team-name { font-size: 0.78rem; }
+        .team-name img { width: 16px !important; height: 16px !important; }
         [data-testid="stForm"] .stNumberInput > div > div > input {
-            font-size: 0.85rem !important; height: 1.5rem !important; padding: 1px 0 !important;
+            font-size: 0.9rem !important; height: 1.7rem !important; padding: 2px 1px !important;
         }
-        .compact-row-border { margin: 0 !important; padding: 0 !important; }
+        .compact-row-border { padding: 3px 0 !important; }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -322,11 +338,10 @@ def _team_html(name: str, logos: dict[str, str], size: int = 22) -> str:
 
 
 def _team_md(name: str, logos: dict[str, str], size: int = 22) -> str:
-    """Return markdown-safe team name with optional crest image (for st.markdown)."""
+    """Return markdown-safe team name with optional crest image, wrapped in .team-name."""
     logo = logos.get(name, "")
-    if logo:
-        return f'<img src="{logo}" width="{size}" height="{size}" style="vertical-align:middle;margin-right:4px"> **{name}**'
-    return f"**{name}**"
+    img = f'<img src="{logo}" width="{size}" height="{size}" style="vertical-align:middle;margin-right:4px">' if logo else ""
+    return f'<div class="team-name">{img}<strong>{name}</strong></div>'
 
 
 def _weekday_pt(dt: datetime) -> str:
@@ -463,9 +478,9 @@ def widget_upcoming_bets():
                 ) if odds else ""
                 home_md = _team_md(m['home_team'], logos)
                 away_md = _team_md(m['away_team'], logos)
-                cols = st.columns([3, 1, 0.5, 1, 3])
+                cols = st.columns([2.5, 1.2, 0.3, 1.2, 2.5])
                 cols[0].markdown(
-                    f'<span class="bet-date">{date_str}</span><br>{home_md} {odds_html}',
+                    f'<span class="bet-date">{date_str}</span>{home_md}{odds_html}',
                     unsafe_allow_html=True,
                 )
                 cols[1].number_input(
@@ -473,7 +488,7 @@ def widget_upcoming_bets():
                     label_visibility="collapsed", key=f"hb_{m['id']}"
                 )
                 cols[2].markdown(
-                    "<div style='text-align:center;padding-top:8px;font-weight:bold;'>x</div>",
+                    "<div style='text-align:center;font-weight:bold;'>x</div>",
                     unsafe_allow_html=True,
                 )
                 cols[3].number_input(
@@ -676,9 +691,9 @@ def page_bets():
                     ) if odds else ""
                     home_md = _team_md(m['home_team'], logos)
                     away_md = _team_md(m['away_team'], logos)
-                    cols = st.columns([3, 1, 0.5, 1, 3])
+                    cols = st.columns([2.5, 1.2, 0.3, 1.2, 2.5])
                     cols[0].markdown(
-                        f'<span class="bet-date">{date_str}</span><br>{home_md} {odds_html}',
+                        f'<span class="bet-date">{date_str}</span>{home_md}{odds_html}',
                         unsafe_allow_html=True,
                     )
                     cols[1].number_input(
@@ -686,7 +701,7 @@ def page_bets():
                         label_visibility="collapsed", key=f"h_{m['id']}"
                     )
                     cols[2].markdown(
-                        "<div style='text-align:center;padding-top:8px;'>x</div>",
+                        "<div style='text-align:center;font-weight:bold;'>x</div>",
                         unsafe_allow_html=True,
                     )
                     cols[3].number_input(
