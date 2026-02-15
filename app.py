@@ -7,7 +7,6 @@ import base64
 import io
 import streamlit as st
 from datetime import datetime, timedelta
-from PIL import Image
 
 import pandas as pd
 
@@ -438,6 +437,7 @@ def _fallback_avatar(entry: dict) -> str:
 
 def _file_to_data_uri(uploaded_file, max_size: int = 80) -> str:
     """Convert an uploaded image to a small thumbnail base64 data URI (~2-5 KB)."""
+    from PIL import Image
     img = Image.open(uploaded_file)
     img = img.convert("RGB")
     # Crop to square from center
@@ -1177,28 +1177,11 @@ def page_admin():
                     db.update_user_avatar(u["id"], test_url)
                 st.success("Avatares de teste atribuídos!")
                 st.rerun()
-            if btn_cols[1].button("🗜️ Comprimir avatares", key="compress_avatars", use_container_width=True):
-                compressed = 0
+            if btn_cols[1].button("🗑️ Limpar avatares", key="clear_avatars", use_container_width=True):
                 for u in users:
-                    av = u.get("avatar_url") or ""
-                    if av.startswith("data:") and len(av) > 15_000:
-                        try:
-                            _header, _b64 = av.split(",", 1)
-                            raw = base64.b64decode(_b64)
-                            img = Image.open(io.BytesIO(raw)).convert("RGB")
-                            w, h = img.size
-                            side = min(w, h)
-                            left = (w - side) // 2
-                            top = (h - side) // 2
-                            img = img.crop((left, top, left + side, top + side))
-                            img = img.resize((80, 80), Image.LANCZOS)
-                            buf = io.BytesIO()
-                            img.save(buf, format="JPEG", quality=70)
-                            small = f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode()}"
-                            db.update_user_avatar(u["id"], small)
-                            compressed += 1
-                        except Exception:
-                            pass
+                    db.update_user_avatar(u["id"], "")
+                st.success("Todos os avatares removidos!")
+                st.rerun()
                 st.success(f"{compressed} avatar(es) comprimido(s)!")
                 st.rerun()
             for u in users:
