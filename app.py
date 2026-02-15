@@ -134,11 +134,23 @@ st.markdown("""
     .odds-source { font-size: 0.58rem; color: #bbb; margin-left: 4px; }
 
     /* ── Compact betting form rows ──────────────────────────────── */
-    .compact-bet-form .stNumberInput { margin-bottom: -0.6rem; }
-    .compact-bet-form .stNumberInput > div > div > input { padding: 4px 2px; font-size: 0.95rem; }
-    .compact-bet-form .stMarkdown { margin-bottom: -0.5rem; }
+    .compact-bet-form [data-testid="stVerticalBlock"] { gap: 0rem !important; }
+    .compact-bet-form [data-testid="stHorizontalBlock"] { gap: 0.3rem !important; }
+    .compact-bet-form .stNumberInput { margin-bottom: 0; }
+    .compact-bet-form .stNumberInput > div > div > input { padding: 2px 1px; font-size: 0.9rem; height: 2rem; }
+    .compact-bet-form .stMarkdown { margin-bottom: 0; }
+    .compact-bet-form .stCaption { margin-bottom: 0; }
     .compact-bet-form [data-testid="stVerticalBlock"] > [data-testid="stVerticalBlockBorderWrapper"] { padding: 0; }
-    .compact-row-border { border-bottom: 1px solid #e8e8e8; padding-bottom: 2px; margin-bottom: 2px; }
+    .compact-row-border { border-bottom: 1px solid #e8e8e8; padding-bottom: 0; margin-bottom: 0; }
+
+    /* ── Mobile: hide odds, shrink text ────────────────────────── */
+    @media (max-width: 640px) {
+        .compact-bet-form .odds-row { display: none !important; }
+        .compact-bet-form .stCaption p { font-size: 0.62rem !important; line-height: 1.1; }
+        .compact-bet-form .stMarkdown p { font-size: 0.78rem !important; line-height: 1.2; }
+        .compact-bet-form .stMarkdown img { width: 16px !important; height: 16px !important; }
+        .compact-bet-form .stNumberInput > div > div > input { font-size: 0.85rem; height: 1.8rem; padding: 1px 0; }
+    }
 </style>
 """, unsafe_allow_html=True)
 
