@@ -4,8 +4,10 @@ Main Streamlit application.
 """
 
 import base64
+import io
 import streamlit as st
 from datetime import datetime, timedelta
+from PIL import Image
 
 import pandas as pd
 
@@ -269,6 +271,31 @@ st.markdown("""
 
 db.init_db()
 
+# ─── Shrink oversized base64 avatars (one-time per session) ───────────────────
+
+if "avatars_checked" not in st.session_state:
+    st.session_state["avatars_checked"] = True
+    _MAX_AVATAR_LEN = 15_000  # ~10 KB base64 ≈ ~7 KB image, plenty for 80px thumbnail
+    for _u in db.get_all_users():
+        _av = _u.get("avatar_url") or ""
+        if _av.startswith("data:") and len(_av) > _MAX_AVATAR_LEN:
+            try:
+                _header, _b64 = _av.split(",", 1)
+                _raw = base64.b64decode(_b64)
+                _img = Image.open(io.BytesIO(_raw)).convert("RGB")
+                _w, _h = _img.size
+                _side = min(_w, _h)
+                _left = (_w - _side) // 2
+                _top = (_h - _side) // 2
+                _img = _img.crop((_left, _top, _left + _side, _top + _side))
+                _img = _img.resize((80, 80), Image.LANCZOS)
+                _buf = io.BytesIO()
+                _img.save(_buf, format="JPEG", quality=70)
+                _small = f"data:image/jpeg;base64,{base64.b64encode(_buf.getvalue()).decode()}"
+                db.update_user_avatar(_u["id"], _small)
+            except Exception:
+                pass
+
 # ─── Sidebar Navigation ───────────────────────────────────────────────────────
 
 PAGES = ["Inicio", "Meus Palpites", "Classificacao"]
@@ -434,12 +461,22 @@ def _fallback_avatar(entry: dict) -> str:
     return f"https://ui-avatars.com/api/?name={name}&background={color}&color=fff&size=52&bold=true&format=png"
 
 
-def _file_to_data_uri(uploaded_file) -> str:
-    """Convert a Streamlit UploadedFile to a base64 data URI."""
-    data = uploaded_file.read()
-    b64 = base64.b64encode(data).decode()
-    mime = uploaded_file.type or "image/png"
-    return f"data:{mime};base64,{b64}"
+def _file_to_data_uri(uploaded_file, max_size: int = 80) -> str:
+    """Convert an uploaded image to a small thumbnail base64 data URI (~2-5 KB)."""
+    img = Image.open(uploaded_file)
+    img = img.convert("RGB")
+    # Crop to square from center
+    w, h = img.size
+    side = min(w, h)
+    left = (w - side) // 2
+    top = (h - side) // 2
+    img = img.crop((left, top, left + side, top + side))
+    # Resize to small thumbnail
+    img = img.resize((max_size, max_size), Image.LANCZOS)
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=70)
+    b64 = base64.b64encode(buf.getvalue()).decode()
+    return f"data:image/jpeg;base64,{b64}"
 
 
 def _avatar_img(entry: dict) -> str:
