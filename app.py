@@ -132,6 +132,13 @@ st.markdown("""
     .odds-badge.away { color: #6b1a1a; background: #fce8e8; }
     .odds-label { font-size: 0.62rem; color: #999; font-weight: 500; }
     .odds-source { font-size: 0.58rem; color: #bbb; margin-left: 4px; }
+
+    /* ── Compact betting form rows ──────────────────────────────── */
+    .compact-bet-form .stNumberInput { margin-bottom: -0.6rem; }
+    .compact-bet-form .stNumberInput > div > div > input { padding: 4px 2px; font-size: 0.95rem; }
+    .compact-bet-form .stMarkdown { margin-bottom: -0.5rem; }
+    .compact-bet-form [data-testid="stVerticalBlock"] > [data-testid="stVerticalBlockBorderWrapper"] { padding: 0; }
+    .compact-row-border { border-bottom: 1px solid #e8e8e8; padding-bottom: 2px; margin-bottom: 2px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -378,8 +385,9 @@ def widget_upcoming_bets():
             unsafe_allow_html=True,
         )
 
-    # Show open matches inside a single form
+    # Show open matches inside a single compact form
     if open_matches:
+        st.markdown('<div class="compact-bet-form">', unsafe_allow_html=True)
         with st.form(key="home_bet_all"):
             open_match_ids = []
             current_league = None
@@ -392,31 +400,31 @@ def widget_upcoming_bets():
                 match_dt = datetime.fromisoformat(m["match_time"])
                 day_name = _weekday_pt(match_dt)
                 date_str = match_dt.strftime(f"%d/%m ({day_name}) %H:%M")
-                odds = odds_map.get(m["id"])
-                st.caption(f"R{m['round_number'] or '?'} · {date_str}")
-                if odds:
-                    st.markdown(_odds_html(odds), unsafe_allow_html=True)
-                cols = st.columns([3, 1, 0.5, 1, 3])
-                cols[0].markdown(_team_md(m['home_team'], logos), unsafe_allow_html=True)
+                saved_icon = "✅" if existing else ""
                 home_val = existing["home_score"] if existing else 0
                 away_val = existing["away_score"] if existing else 0
-                cols[1].number_input(
+                cols = st.columns([1.5, 2.5, 0.7, 0.3, 0.7, 2.5, 0.5])
+                cols[0].caption(date_str)
+                cols[1].markdown(_team_md(m['home_team'], logos), unsafe_allow_html=True)
+                cols[2].number_input(
                     "H", min_value=0, max_value=20, value=home_val,
                     label_visibility="collapsed", key=f"hb_{m['id']}"
                 )
-                cols[2].markdown(
+                cols[3].markdown(
                     "<div style='text-align:center;padding-top:8px;font-weight:bold;'>x</div>",
                     unsafe_allow_html=True,
                 )
-                cols[3].number_input(
+                cols[4].number_input(
                     "A", min_value=0, max_value=20, value=away_val,
                     label_visibility="collapsed", key=f"ab_{m['id']}"
                 )
-                cols[4].markdown(_team_md(m['away_team'], logos), unsafe_allow_html=True)
-                if existing:
-                    st.caption("✅ Salvo")
+                cols[5].markdown(_team_md(m['away_team'], logos), unsafe_allow_html=True)
+                cols[6].markdown(
+                    f"<div style='text-align:center;padding-top:6px;'>{saved_icon}</div>",
+                    unsafe_allow_html=True,
+                )
                 open_match_ids.append(m["id"])
-                st.markdown("---")
+                st.markdown('<div class="compact-row-border"></div>', unsafe_allow_html=True)
 
             if st.form_submit_button("Salvar Todos", use_container_width=True):
                 errors = []
@@ -431,6 +439,7 @@ def widget_upcoming_bets():
                 else:
                     st.success("Todos os palpites salvos!")
                 st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ─── Page: Home ──────────────────────────────────────────────────────────────
@@ -586,6 +595,7 @@ def page_bets():
             r = m.get("round_number") or 0
             rounds.setdefault(r, []).append(m)
 
+        st.markdown('<div class="compact-bet-form">', unsafe_allow_html=True)
         with st.form(key="bet_all"):
             all_open_ids = []
             for round_num in sorted(rounds.keys()):
@@ -597,29 +607,28 @@ def page_bets():
                     match_dt = datetime.fromisoformat(m["match_time"])
                     existing = user_bets.get(m["id"])
                     date_str = match_dt.strftime("%d/%m %H:%M")
-                    odds = odds_map.get(m["id"])
-
-                    st.markdown(f"**{date_str}**")
-                    if odds:
-                        st.markdown(_odds_html(odds), unsafe_allow_html=True)
-                    cols = st.columns([3, 1, 1, 1, 3])
-                    cols[0].markdown(_team_md(m['home_team'], logos), unsafe_allow_html=True)
+                    saved_icon = "✅" if existing else ""
                     home_val = existing["home_score"] if existing else 0
                     away_val = existing["away_score"] if existing else 0
-                    cols[1].number_input(
+                    cols = st.columns([1.5, 2.5, 0.7, 0.3, 0.7, 2.5, 0.5])
+                    cols[0].caption(date_str)
+                    cols[1].markdown(_team_md(m['home_team'], logos), unsafe_allow_html=True)
+                    cols[2].number_input(
                         "H", min_value=0, max_value=20, value=home_val,
                         label_visibility="collapsed", key=f"h_{m['id']}"
                     )
-                    cols[2].markdown("<div style='text-align:center;padding-top:8px;'>x</div>", unsafe_allow_html=True)
-                    cols[3].number_input(
+                    cols[3].markdown("<div style='text-align:center;padding-top:8px;'>x</div>", unsafe_allow_html=True)
+                    cols[4].number_input(
                         "A", min_value=0, max_value=20, value=away_val,
                         label_visibility="collapsed", key=f"a_{m['id']}"
                     )
-                    cols[4].markdown(_team_md(m['away_team'], logos), unsafe_allow_html=True)
-                    if existing:
-                        st.caption("✅ Salvo")
+                    cols[5].markdown(_team_md(m['away_team'], logos), unsafe_allow_html=True)
+                    cols[6].markdown(
+                        f"<div style='text-align:center;padding-top:6px;'>{saved_icon}</div>",
+                        unsafe_allow_html=True,
+                    )
                     all_open_ids.append(m["id"])
-                    st.markdown("---")
+                    st.markdown('<div class="compact-row-border"></div>', unsafe_allow_html=True)
 
             if st.form_submit_button("Salvar Todos", use_container_width=True):
                 errors = []
@@ -634,6 +643,7 @@ def page_bets():
                 else:
                     st.success("Todos os palpites salvos!")
                 st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ─── Page: Leaderboard ────────────────────────────────────────────────────────
