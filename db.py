@@ -462,6 +462,7 @@ def get_leaderboard() -> list[dict]:
             SELECT
                 u.id as user_id,
                 u.username,
+                u.avatar_url,
                 COALESCE(SUM(b.points_awarded), 0) as total_points,
                 COALESCE(SUM(CASE WHEN b.points_awarded = (
                     SELECT exact_score FROM scoring_config WHERE id = 1

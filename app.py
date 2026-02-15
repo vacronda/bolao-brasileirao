@@ -97,7 +97,14 @@ st.markdown("""
     .lb-table tr td:last-child { border-radius: 0 8px 8px 0; }
     .lb-table tr { box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
     .lb-rank-cell { font-weight: 800; font-size: 1rem; width: 40px; text-align: center !important; }
-    .lb-name-cell { font-weight: 600; color: #222; }
+    .lb-name-cell {
+        font-weight: 600; color: #222;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .lb-avatar {
+        width: 26px; height: 26px; border-radius: 50%; object-fit: cover;
+        flex-shrink: 0; vertical-align: middle;
+    }
     .lb-pts-cell { font-weight: 700; color: #00a86b; }
     .lb-exact-cell { font-size: 0.8rem; color: #888; }
     .lb-stat-cell { font-size: 0.8rem; color: #888; text-align: center !important; }
@@ -398,6 +405,24 @@ def _weekday_pt(dt: datetime) -> str:
     return days[dt.weekday()]
 
 
+_FALLBACK_BALLS = [
+    "https://em-content.zobj.net/source/apple/391/soccer-ball_26bd.png",
+    "https://em-content.zobj.net/source/google/387/soccer-ball_26bd.png",
+    "https://em-content.zobj.net/source/samsung/349/soccer-ball_26bd.png",
+    "https://em-content.zobj.net/source/microsoft/379/soccer-ball_26bd.png",
+    "https://em-content.zobj.net/source/facebook/355/soccer-ball_26bd.png",
+    "https://em-content.zobj.net/source/twitter/376/soccer-ball_26bd.png",
+]
+
+
+def _avatar_img(entry: dict) -> str:
+    """Return an <img> tag for the user's avatar or a deterministic fallback ball."""
+    url = entry.get("avatar_url") or ""
+    if not url:
+        url = _FALLBACK_BALLS[entry["user_id"] % len(_FALLBACK_BALLS)]
+    return f'<img class="lb-avatar" src="{url}" alt="">'
+
+
 def widget_leaderboard_mini():
     """Show full leaderboard on the home page."""
     leaderboard = db.get_leaderboard()
@@ -417,10 +442,11 @@ def widget_leaderboard_mini():
         row_class = "lb-me " if is_me else ""
         row_class += f"lb-top{rank}" if rank <= 3 else ""
         me_tag = " &#9668;" if is_me else ""
+        avatar = _avatar_img(entry)
         rows_html += (
             f'<tr class="{row_class}">'
             f'<td class="lb-rank-cell">{medal}</td>'
-            f'<td class="lb-name-cell">{entry["username"]}{me_tag}</td>'
+            f'<td class="lb-name-cell">{avatar}{entry["username"]}{me_tag}</td>'
             f'<td class="lb-stat-cell">{entry["total_bets"]}</td>'
             f'<td class="lb-stat-cell">{entry["exact_count"]}</td>'
             f'<td class="lb-stat-cell">{entry["zero_count"]}</td>'
@@ -812,10 +838,11 @@ def page_leaderboard():
         row_class = "lb-me " if is_me else ""
         row_class += f"lb-top{rank}" if rank <= 3 else ""
         me_tag = " &#9668;" if is_me else ""
+        avatar = _avatar_img(entry)
         rows_html += (
             f'<tr class="{row_class}">'
             f'<td class="lb-rank-cell">{medal}</td>'
-            f'<td class="lb-name-cell">{entry["username"]}{me_tag}</td>'
+            f'<td class="lb-name-cell">{avatar}{entry["username"]}{me_tag}</td>'
             f'<td class="lb-stat-cell">{entry["total_bets"]}</td>'
             f'<td class="lb-stat-cell">{entry["exact_count"]}</td>'
             f'<td class="lb-stat-cell">{entry["zero_count"]}</td>'
