@@ -438,7 +438,7 @@ def _avatar_img(entry: dict, avatars: dict[int, str] | None = None) -> str:
         url = (entry.get("avatar_url") or "").strip()
     if not url.startswith("http"):
         url = _fallback_avatar(entry)
-    return f'<img class="lb-avatar" src="{url}" alt="">'
+    return f'<a href="{url}" target="_blank"><img class="lb-avatar" src="{url}" alt=""></a>'
 
 
 def widget_leaderboard_mini():
