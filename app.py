@@ -3,8 +3,6 @@ Bolão do Brasileirão - Soccer Betting Pool.
 Main Streamlit application.
 """
 
-import base64
-import io
 import streamlit as st
 from datetime import datetime, timedelta
 
@@ -281,23 +279,18 @@ with st.sidebar:
         user = auth.get_current_user()
         st.write(f"Olá, **{user['username']}**!")
         with st.expander("👤 Minha Conta"):
-            # Avatar upload
-            current_avatar = user.get("avatar_url") or ""
-            if current_avatar:
-                st.markdown(
-                    f'<img src="{current_avatar}" style="width:50px;height:50px;border-radius:50%;object-fit:cover;">',
-                    unsafe_allow_html=True,
+            with st.form("sidebar_avatar"):
+                avatar_url = st.text_input(
+                    "URL da foto de perfil",
+                    value=user.get("avatar_url") or "",
+                    key="sb_avatar_url",
+                    help="Cole o link de uma imagem (ex: imgur, gravatar)",
                 )
-            avatar_file = st.file_uploader(
-                "Foto de perfil", type=["png", "jpg", "jpeg", "gif", "webp"],
-                key="sb_avatar_upload",
-            )
-            if avatar_file is not None:
-                data_uri = _file_to_data_uri(avatar_file)
-                db.update_user_avatar(user["id"], data_uri)
-                st.session_state["user"]["avatar_url"] = data_uri
-                st.success("Avatar atualizado!")
-                st.rerun()
+                if st.form_submit_button("Salvar Avatar", use_container_width=True):
+                    db.update_user_avatar(user["id"], avatar_url.strip())
+                    st.session_state["user"]["avatar_url"] = avatar_url.strip()
+                    st.success("Avatar atualizado!")
+                    st.rerun()
             st.divider()
             with st.form("sidebar_change_name"):
                 new_name = st.text_input("Novo nome de usuário", value=user["username"], key="sb_new_name")
@@ -435,24 +428,6 @@ def _fallback_avatar(entry: dict) -> str:
     return f"https://ui-avatars.com/api/?name={name}&background={color}&color=fff&size=52&bold=true&format=png"
 
 
-def _file_to_data_uri(uploaded_file, max_size: int = 80) -> str:
-    """Convert an uploaded image to a small thumbnail base64 data URI (~2-5 KB)."""
-    from PIL import Image
-    img = Image.open(uploaded_file)
-    img = img.convert("RGB")
-    # Crop to square from center
-    w, h = img.size
-    side = min(w, h)
-    left = (w - side) // 2
-    top = (h - side) // 2
-    img = img.crop((left, top, left + side, top + side))
-    # Resize to small thumbnail
-    img = img.resize((max_size, max_size), Image.LANCZOS)
-    buf = io.BytesIO()
-    img.save(buf, format="JPEG", quality=70)
-    b64 = base64.b64encode(buf.getvalue()).decode()
-    return f"data:image/jpeg;base64,{b64}"
-
 
 def _avatar_img(entry: dict, avatars: dict[int, str] | None = None) -> str:
     """Return an <img> tag for the user's avatar or a generated initial-based fallback."""
@@ -461,19 +436,7 @@ def _avatar_img(entry: dict, avatars: dict[int, str] | None = None) -> str:
         url = (avatars.get(entry["user_id"]) or "").strip()
     else:
         url = (entry.get("avatar_url") or "").strip()
-    if url.startswith("data:"):
-        pass  # base64 data URI — always valid
-    elif url.startswith("http"):
-        _IMG_EXT = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp")
-        _AVATAR_SERVICES = ("pravatar.cc", "ui-avatars.com", "gravatar.com", "avatars.githubusercontent.com", "lh3.googleusercontent.com")
-        lower = url.lower().split("?")[0]
-        is_image = any(lower.endswith(ext) for ext in _IMG_EXT)
-        is_service = any(svc in url for svc in _AVATAR_SERVICES)
-        if not is_image and not is_service:
-            url = ""
-    else:
-        url = ""
-    if not url:
+    if not url.startswith("http"):
         url = _fallback_avatar(entry)
     return f'<img class="lb-avatar" src="{url}" alt="">'
 
@@ -1182,8 +1145,6 @@ def page_admin():
                     db.update_user_avatar(u["id"], "")
                 st.success("Todos os avatares removidos!")
                 st.rerun()
-                st.success(f"{compressed} avatar(es) comprimido(s)!")
-                st.rerun()
             for u in users:
                 with st.expander(f"👤 {u['username']}"):
                     current_avatar = u.get("avatar_url") or ""
@@ -1192,21 +1153,12 @@ def page_admin():
                             f'<img src="{current_avatar}" style="width:50px;height:50px;border-radius:50%;object-fit:cover;">',
                             unsafe_allow_html=True,
                         )
-                    avatar_file = st.file_uploader(
-                        "Upload foto", type=["png", "jpg", "jpeg", "gif", "webp"],
-                        key=f"avatar_upload_{u['id']}",
-                    )
-                    if avatar_file is not None:
-                        data_uri = _file_to_data_uri(avatar_file)
-                        db.update_user_avatar(u["id"], data_uri)
-                        st.success(f"Avatar de {u['username']} atualizado!")
-                        st.rerun()
                     with st.form(key=f"avatar_{u['id']}"):
                         avatar_input = st.text_input(
-                            "Ou cole uma URL", value="" if current_avatar.startswith("data:") else current_avatar,
+                            "URL do avatar", value=current_avatar,
                             key=f"avatar_input_{u['id']}"
                         )
-                        if st.form_submit_button("Salvar URL", use_container_width=True):
+                        if st.form_submit_button("Salvar Avatar", use_container_width=True):
                             db.update_user_avatar(u["id"], avatar_input.strip())
                             st.success(f"Avatar de {u['username']} atualizado!")
                             st.rerun()
