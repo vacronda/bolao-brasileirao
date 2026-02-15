@@ -134,38 +134,47 @@ st.markdown("""
     .odds-source { font-size: 0.58rem; color: #bbb; margin-left: 4px; }
 
     /* ── Compact betting form rows ──────────────────────────────── */
-    .compact-bet-form [data-testid="stVerticalBlock"] { gap: 0rem !important; }
-    .compact-bet-form [data-testid="stHorizontalBlock"] {
-        gap: 0.25rem !important;
+    [data-testid="stForm"] [data-testid="stVerticalBlock"] { gap: 0rem !important; }
+    [data-testid="stForm"] [data-testid="stHorizontalBlock"] {
+        gap: 0.2rem !important;
         flex-wrap: nowrap !important;
         flex-direction: row !important;
         align-items: center !important;
     }
-    .compact-bet-form [data-testid="stHorizontalBlock"] [data-testid="column"] {
+    [data-testid="stForm"] [data-testid="stHorizontalBlock"] [data-testid="column"] {
         min-width: 0 !important;
         overflow: hidden;
     }
-    .compact-bet-form .stNumberInput { margin-bottom: 0; }
-    .compact-bet-form .stNumberInput > div > div > input {
-        padding: 2px 1px; font-size: 0.9rem; height: 1.8rem;
-        -moz-appearance: textfield;
+    [data-testid="stForm"] .stNumberInput { margin-bottom: 0 !important; }
+    [data-testid="stForm"] .stNumberInput > div > div > input {
+        padding: 2px 1px !important; font-size: 0.9rem !important; height: 1.8rem !important;
+        -moz-appearance: textfield !important;
     }
-    .compact-bet-form .stNumberInput > div > div > input::-webkit-outer-spin-button,
-    .compact-bet-form .stNumberInput > div > div > input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-    .compact-bet-form .stNumberInput button { display: none !important; }
-    .compact-bet-form .stMarkdown { margin-bottom: 0; }
-    .compact-bet-form .stMarkdown p { font-size: 0.82rem !important; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .compact-bet-form .stCaption { margin-bottom: 0; }
-    .compact-bet-form .stCaption p { font-size: 0.65rem !important; line-height: 1.1; }
-    .compact-bet-form [data-testid="stVerticalBlock"] > [data-testid="stVerticalBlockBorderWrapper"] { padding: 0; }
-    .compact-bet-form .odds-row { display: none !important; }
-    .compact-bet-form .stMarkdown img { width: 16px !important; height: 16px !important; }
+    [data-testid="stForm"] .stNumberInput > div > div > input::-webkit-outer-spin-button,
+    [data-testid="stForm"] .stNumberInput > div > div > input::-webkit-inner-spin-button {
+        -webkit-appearance: none !important; margin: 0 !important;
+    }
+    [data-testid="stForm"] .stNumberInput button { display: none !important; }
+    [data-testid="stForm"] .stMarkdown { margin-bottom: 0 !important; }
+    [data-testid="stForm"] .stMarkdown p {
+        font-size: 0.82rem !important; line-height: 1.2 !important;
+        white-space: nowrap !important; overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+    [data-testid="stForm"] .stCaption { margin-bottom: 0 !important; }
+    [data-testid="stForm"] .stCaption p { font-size: 0.65rem !important; line-height: 1.1 !important; }
+    [data-testid="stForm"] [data-testid="stVerticalBlockBorderWrapper"] { padding: 0 !important; }
     .compact-row-border { border-bottom: 1px solid #e8e8e8; padding-bottom: 0; margin-bottom: 0; }
 
-    /* ── Desktop: show odds ────────────────────────────────────── */
-    @media (min-width: 641px) {
-        .compact-bet-form .odds-row { display: flex !important; }
-        .compact-bet-form .stMarkdown img { width: 22px !important; height: 22px !important; }
+    /* ── Mobile: hide odds, shrink everything ──────────────────── */
+    @media (max-width: 768px) {
+        [data-testid="stForm"] .odds-row { display: none !important; }
+        [data-testid="stForm"] .stMarkdown img { width: 14px !important; height: 14px !important; }
+        [data-testid="stForm"] .stMarkdown p { font-size: 0.72rem !important; }
+        [data-testid="stForm"] .stCaption p { font-size: 0.55rem !important; }
+        [data-testid="stForm"] .stNumberInput > div > div > input {
+            font-size: 0.8rem !important; height: 1.5rem !important; padding: 1px 0 !important;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -415,7 +424,6 @@ def widget_upcoming_bets():
 
     # Show open matches inside a single compact form
     if open_matches:
-        st.markdown('<div class="compact-bet-form">', unsafe_allow_html=True)
         with st.form(key="home_bet_all"):
             open_match_ids = []
             current_league = None
@@ -476,7 +484,6 @@ def widget_upcoming_bets():
                 else:
                     st.success("Todos os palpites salvos!")
                 st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ─── Page: Home ──────────────────────────────────────────────────────────────
@@ -632,7 +639,6 @@ def page_bets():
             r = m.get("round_number") or 0
             rounds.setdefault(r, []).append(m)
 
-        st.markdown('<div class="compact-bet-form">', unsafe_allow_html=True)
         with st.form(key="bet_all"):
             all_open_ids = []
             for round_num in sorted(rounds.keys()):
@@ -692,7 +698,6 @@ def page_bets():
                 else:
                     st.success("Todos os palpites salvos!")
                 st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ─── Page: Leaderboard ────────────────────────────────────────────────────────
