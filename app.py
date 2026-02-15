@@ -408,14 +408,27 @@ def _weekday_pt(dt: datetime) -> str:
 _AVATAR_COLORS = ["0D8ABC", "E17055", "00B894", "6C5CE7", "FDCB6E", "E84393", "00CEC9", "D63031"]
 
 
+def _fallback_avatar(entry: dict) -> str:
+    """Generate a deterministic initial-based avatar URL."""
+    name = entry.get("username", "?")
+    color = _AVATAR_COLORS[entry["user_id"] % len(_AVATAR_COLORS)]
+    return f"https://ui-avatars.com/api/?name={name}&background={color}&color=fff&size=52&bold=true&format=png"
+
+
 def _avatar_img(entry: dict) -> str:
     """Return an <img> tag for the user's avatar or a generated initial-based fallback."""
-    url = entry.get("avatar_url") or ""
+    url = (entry.get("avatar_url") or "").strip()
+    # Only trust URLs that look like actual images
+    _IMG_EXT = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp")
+    _AVATAR_SERVICES = ("pravatar.cc", "ui-avatars.com", "gravatar.com", "avatars.githubusercontent.com", "lh3.googleusercontent.com")
+    if url.startswith("http"):
+        lower = url.lower().split("?")[0]
+        is_image = any(lower.endswith(ext) for ext in _IMG_EXT)
+        is_service = any(svc in url for svc in _AVATAR_SERVICES)
+        if not is_image and not is_service:
+            url = ""
     if not url or not url.startswith("http"):
-        # Generate a deterministic avatar from initials
-        name = entry.get("username", "?")
-        color = _AVATAR_COLORS[entry["user_id"] % len(_AVATAR_COLORS)]
-        url = f"https://ui-avatars.com/api/?name={name}&background={color}&color=fff&size=52&bold=true&format=png"
+        url = _fallback_avatar(entry)
     return f'<img class="lb-avatar" src="{url}" alt="">'
 
 
