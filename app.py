@@ -186,53 +186,28 @@ st.markdown("""
     [data-testid="stForm"] [data-testid="stVerticalBlockBorderWrapper"] { padding: 0 !important; }
     .compact-row-border { display: none; }
 
-    /* ── Mobile: two-line card (teams row + inputs row) ────────── */
+    /* ── Mobile portrait: single row, everything smaller ─────── */
     @media (max-width: 600px) {
-        .block-container { padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
-        [data-testid="stForm"] { padding: 0.4rem !important; }
+        .block-container { padding-left: 0.3rem !important; padding-right: 0.3rem !important; }
+        [data-testid="stForm"] { padding: 0.3rem !important; }
 
         [data-testid="stForm"] [data-testid="stHorizontalBlock"] {
-            flex-wrap: wrap !important;
-            gap: 2px 0 !important;
-            padding: 8px 4px !important;
-            justify-content: center !important;
-        }
-
-        /* Override Streamlit's inline width: calc(...) on each column */
-        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"] {
-            width: auto !important; flex: none !important;
-        }
-
-        /* Row 1: Home team (left) + Away team (right) */
-        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1) {
-            order: 1 !important; width: 48% !important; flex: 0 0 48% !important;
-        }
-        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(5) {
-            order: 2 !important; width: 48% !important; flex: 0 0 48% !important;
-            text-align: right !important;
-        }
-        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(5) .team-name {
-            justify-content: flex-end;
-        }
-
-        /* Row 2: [H input] x [A input] centered */
-        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2) {
-            order: 3 !important; width: 30% !important; flex: 0 0 30% !important;
-        }
-        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) {
-            order: 4 !important; width: 10% !important; flex: 0 0 10% !important;
-            text-align: center !important;
-        }
-        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) {
-            order: 5 !important; width: 30% !important; flex: 0 0 30% !important;
+            gap: 0.2rem !important;
+            padding: 6px 0 !important;
         }
 
         .bet-date { display: none !important; }
         [data-testid="stForm"] .odds-row { display: none !important; }
-        .team-name { font-size: 0.8rem; }
-        .team-name img { width: 16px !important; height: 16px !important; margin-right: 4px !important; }
+        .team-name { font-size: 0.72rem; }
+        .team-name img { width: 14px !important; height: 14px !important; margin-right: 3px !important; }
+        [data-testid="stForm"] .stNumberInput > div {
+            max-width: 2.5rem !important;
+        }
+        [data-testid="stForm"] .stNumberInput > div > div {
+            max-width: 2.5rem !important;
+        }
         [data-testid="stForm"] .stNumberInput > div > div > input {
-            font-size: 1rem !important; height: 1.8rem !important; width: 2.8rem !important;
+            font-size: 0.9rem !important; height: 1.6rem !important; width: 2.2rem !important;
         }
     }
 </style>
