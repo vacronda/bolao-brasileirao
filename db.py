@@ -187,6 +187,12 @@ def init_db():
         except Exception:
             conn.execute("ALTER TABLE matches ADD COLUMN league TEXT NOT NULL DEFAULT 'Brasileirão'")
 
+        # Migration: add avatar_url column if missing
+        try:
+            conn.execute("SELECT avatar_url FROM users LIMIT 1")
+        except Exception:
+            conn.execute("ALTER TABLE users ADD COLUMN avatar_url TEXT")
+
         row = _to_dict(conn.execute("SELECT COUNT(*) as cnt FROM scoring_config").fetchone())
         if row["cnt"] == 0:
             conn.execute("INSERT INTO scoring_config (id) VALUES (1)")
@@ -237,7 +243,7 @@ def get_user_by_username(username: str) -> dict | None:
 def get_all_users() -> list[dict]:
     with get_conn() as conn:
         rows = conn.execute(
-            "SELECT id, username, is_admin FROM users ORDER BY username"
+            "SELECT id, username, is_admin, avatar_url FROM users ORDER BY username"
         ).fetchall()
         return _to_dicts(rows)
 
@@ -261,6 +267,33 @@ def reset_user_password(user_id: int, new_password_hash: str):
         conn.execute(
             "UPDATE users SET password_hash = ? WHERE id = ?",
             (new_password_hash, user_id),
+        )
+
+
+def update_username(user_id: int, new_username: str) -> bool:
+    """Update a user's username. Returns False if the new name is already taken."""
+    with get_conn() as conn:
+        existing = _to_dict(
+            conn.execute(
+                "SELECT id FROM users WHERE username = ? AND id != ?",
+                (new_username, user_id),
+            ).fetchone()
+        )
+        if existing:
+            return False
+        conn.execute(
+            "UPDATE users SET username = ? WHERE id = ?",
+            (new_username, user_id),
+        )
+        return True
+
+
+def update_user_avatar(user_id: int, avatar_url: str):
+    """Update a user's avatar URL."""
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE users SET avatar_url = ? WHERE id = ?",
+            (avatar_url, user_id),
         )
 
 

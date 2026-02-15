@@ -149,12 +149,29 @@ with st.sidebar:
     if auth.is_logged_in():
         user = auth.get_current_user()
         st.write(f"Olá, **{user['username']}**!")
-        with st.expander("🔒 Alterar Senha"):
+        with st.expander("👤 Minha Conta"):
+            with st.form("sidebar_change_name"):
+                new_name = st.text_input("Novo nome de usuário", value=user["username"], key="sb_new_name")
+                if st.form_submit_button("Salvar Nome", use_container_width=True):
+                    new_name = new_name.strip()
+                    if not new_name or len(new_name) < 3:
+                        st.error("Mínimo 3 caracteres.")
+                    elif new_name == user["username"]:
+                        st.info("Nome não alterado.")
+                    else:
+                        ok = db.update_username(user["id"], new_name)
+                        if ok:
+                            st.session_state["user"]["username"] = new_name
+                            st.success("Nome alterado!")
+                            st.rerun()
+                        else:
+                            st.error("Este nome já está em uso.")
+            st.divider()
             with st.form("sidebar_change_pw"):
                 cur_pw = st.text_input("Senha atual", type="password", key="sb_cur_pw")
                 new_pw = st.text_input("Nova senha", type="password", key="sb_new_pw")
                 new_pw2 = st.text_input("Confirmar", type="password", key="sb_new_pw2")
-                if st.form_submit_button("Alterar", use_container_width=True):
+                if st.form_submit_button("Alterar Senha", use_container_width=True):
                     stored = db.get_user_by_username(user["username"])
                     if not auth.verify_password(cur_pw, stored["password_hash"]):
                         st.error("Senha atual incorreta.")
@@ -900,6 +917,17 @@ def page_admin():
         else:
             for u in users:
                 with st.expander(f"👤 {u['username']}"):
+                    current_avatar = u.get("avatar_url") or ""
+                    if current_avatar:
+                        st.image(current_avatar, width=60)
+                    with st.form(key=f"avatar_{u['id']}"):
+                        avatar_input = st.text_input(
+                            "URL do avatar", value=current_avatar, key=f"avatar_input_{u['id']}"
+                        )
+                        if st.form_submit_button("Salvar Avatar", use_container_width=True):
+                            db.update_user_avatar(u["id"], avatar_input.strip())
+                            st.success(f"Avatar de {u['username']} atualizado!")
+                            st.rerun()
                     with st.form(key=f"reset_pw_{u['id']}"):
                         new_pw = st.text_input(
                             "Nova senha", type="password", key=f"pw_input_{u['id']}"
