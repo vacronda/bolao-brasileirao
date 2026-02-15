@@ -417,10 +417,11 @@ _FALLBACK_BALLS = [
 
 def _avatar_img(entry: dict) -> str:
     """Return an <img> tag for the user's avatar or a deterministic fallback ball."""
+    fallback = _FALLBACK_BALLS[entry["user_id"] % len(_FALLBACK_BALLS)]
     url = entry.get("avatar_url") or ""
     if not url:
-        url = _FALLBACK_BALLS[entry["user_id"] % len(_FALLBACK_BALLS)]
-    return f'<img class="lb-avatar" src="{url}" alt="">'
+        url = fallback
+    return f'<img class="lb-avatar" src="{url}" onerror="this.onerror=null;this.src=\'{fallback}\'" alt="">'
 
 
 def widget_leaderboard_mini():
