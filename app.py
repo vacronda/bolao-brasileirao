@@ -166,15 +166,24 @@ st.markdown("""
     [data-testid="stForm"] [data-testid="stVerticalBlockBorderWrapper"] { padding: 0 !important; }
     .compact-row-border { border-bottom: 1px solid #e8e8e8; padding-bottom: 0; margin-bottom: 0; }
 
-    /* ── Mobile: hide odds, shrink everything ──────────────────── */
+    /* ── Mobile: hide date & saved cols, hide odds, shrink ────── */
     @media (max-width: 768px) {
+        /* Hide col 1 (date) and col 7 (saved icon) */
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1),
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(7) {
+            display: none !important;
+        }
         [data-testid="stForm"] .odds-row { display: none !important; }
         [data-testid="stForm"] .stMarkdown img { width: 14px !important; height: 14px !important; }
-        [data-testid="stForm"] .stMarkdown p { font-size: 0.72rem !important; }
-        [data-testid="stForm"] .stCaption p { font-size: 0.55rem !important; }
+        [data-testid="stForm"] .stMarkdown p { font-size: 0.75rem !important; }
         [data-testid="stForm"] .stNumberInput > div > div > input {
-            font-size: 0.8rem !important; height: 1.5rem !important; padding: 1px 0 !important;
+            font-size: 0.85rem !important; height: 1.6rem !important; padding: 1px 0 !important;
+            width: 2.5rem !important;
         }
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] {
+            padding: 2px 0 !important; min-height: 0 !important;
+        }
+        .compact-row-border { margin: 0 !important; padding: 0 !important; }
     }
 </style>
 """, unsafe_allow_html=True)
