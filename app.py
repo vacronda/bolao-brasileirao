@@ -161,18 +161,21 @@ st.markdown("""
     [data-testid="stForm"] [data-testid="stHorizontalBlock"] [data-testid="column"] {
         min-width: 0 !important; overflow: hidden;
     }
+    /* ── Score input: small centered box ───────────────────────── */
     [data-testid="stForm"] .stNumberInput { margin-bottom: 0 !important; }
     [data-testid="stForm"] .stNumberInput > div {
         min-width: 0 !important; justify-content: center !important;
+        max-width: 3.5rem !important; margin: 0 auto !important;
     }
-    [data-testid="stForm"] .stNumberInput > div > div { min-width: 0 !important; }
+    [data-testid="stForm"] .stNumberInput > div > div {
+        min-width: 0 !important; max-width: 3.5rem !important;
+    }
     [data-testid="stForm"] .stNumberInput > div > div > input {
         text-align: center !important;
         padding: 0 !important; font-size: 1.1rem !important; font-weight: 700 !important;
-        height: 2.2rem !important;
-        min-width: 0 !important; width: 100% !important; max-width: 3rem !important;
-        margin-left: auto !important; margin-right: auto !important;
+        height: 2.2rem !important; width: 3rem !important;
         -moz-appearance: textfield !important;
+        border-radius: 8px !important;
     }
     [data-testid="stForm"] .stNumberInput > div > div > input::-webkit-outer-spin-button,
     [data-testid="stForm"] .stNumberInput > div > div > input::-webkit-inner-spin-button {
@@ -191,16 +194,21 @@ st.markdown("""
         [data-testid="stForm"] [data-testid="stHorizontalBlock"] {
             flex-wrap: wrap !important;
             gap: 2px 0 !important;
-            padding: 8px 0 !important;
+            padding: 8px 4px !important;
             justify-content: center !important;
+        }
+
+        /* Override Streamlit's inline width: calc(...) on each column */
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+            width: auto !important; flex: none !important;
         }
 
         /* Row 1: Home team (left) + Away team (right) */
         [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1) {
-            order: 1 !important; flex: 1 1 48% !important; max-width: 48% !important;
+            order: 1 !important; width: 48% !important; flex: 0 0 48% !important;
         }
         [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(5) {
-            order: 2 !important; flex: 1 1 48% !important; max-width: 48% !important;
+            order: 2 !important; width: 48% !important; flex: 0 0 48% !important;
             text-align: right !important;
         }
         [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(5) .team-name {
@@ -209,14 +217,14 @@ st.markdown("""
 
         /* Row 2: [H input] x [A input] centered */
         [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2) {
-            order: 3 !important; flex: 0 0 25% !important; max-width: 25% !important;
+            order: 3 !important; width: 30% !important; flex: 0 0 30% !important;
         }
         [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) {
-            order: 4 !important; flex: 0 0 10% !important; max-width: 10% !important;
+            order: 4 !important; width: 10% !important; flex: 0 0 10% !important;
             text-align: center !important;
         }
         [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) {
-            order: 5 !important; flex: 0 0 25% !important; max-width: 25% !important;
+            order: 5 !important; width: 30% !important; flex: 0 0 30% !important;
         }
 
         .bet-date { display: none !important; }
@@ -224,7 +232,7 @@ st.markdown("""
         .team-name { font-size: 0.8rem; }
         .team-name img { width: 16px !important; height: 16px !important; margin-right: 4px !important; }
         [data-testid="stForm"] .stNumberInput > div > div > input {
-            font-size: 1rem !important; height: 1.8rem !important;
+            font-size: 1rem !important; height: 1.8rem !important; width: 2.8rem !important;
         }
     }
 </style>
