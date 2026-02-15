@@ -244,7 +244,7 @@ def _weekday_pt(dt: datetime) -> str:
 
 
 def widget_leaderboard_mini():
-    """Show top 5 of the leaderboard."""
+    """Show full leaderboard on the home page."""
     leaderboard = db.get_leaderboard()
     current_user = auth.get_current_user() if auth.is_logged_in() else None
 
@@ -254,17 +254,8 @@ def widget_leaderboard_mini():
 
     medals = {1: "🥇", 2: "🥈", 3: "🥉"}
 
-    # Decide which entries to show
-    top = leaderboard[:5]
-    extra_me = None
-    if current_user and len(leaderboard) > 5:
-        for i, entry in enumerate(leaderboard):
-            if entry["user_id"] == current_user["id"] and i >= 5:
-                extra_me = (i, entry)
-                break
-
     rows_html = ""
-    for i, entry in enumerate(top):
+    for i, entry in enumerate(leaderboard):
         rank = i + 1
         medal = medals.get(rank, f"{rank}.")
         is_me = current_user and entry["user_id"] == current_user["id"]
@@ -275,20 +266,6 @@ def widget_leaderboard_mini():
             f'<tr class="{row_class}">'
             f'<td class="lb-rank-cell">{medal}</td>'
             f'<td class="lb-name-cell">{entry["username"]}{me_tag}</td>'
-            f'<td class="lb-stat-cell">{entry["total_bets"]}</td>'
-            f'<td class="lb-stat-cell">{entry["exact_count"]}</td>'
-            f'<td class="lb-stat-cell">{entry["zero_count"]}</td>'
-            f'<td class="lb-stat-cell">{entry["missed_count"]}</td>'
-            f'<td class="lb-pts-cell">{entry["total_points"]} pts</td>'
-            f'</tr>'
-        )
-
-    if extra_me:
-        idx, entry = extra_me
-        rows_html += (
-            f'<tr class="lb-me" style="border-top:2px dashed #ccc;">'
-            f'<td class="lb-rank-cell">{idx+1}.</td>'
-            f'<td class="lb-name-cell">{entry["username"]} &#9668;</td>'
             f'<td class="lb-stat-cell">{entry["total_bets"]}</td>'
             f'<td class="lb-stat-cell">{entry["exact_count"]}</td>'
             f'<td class="lb-stat-cell">{entry["zero_count"]}</td>'
