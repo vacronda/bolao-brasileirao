@@ -155,11 +155,14 @@ st.markdown("""
         min-width: 0 !important; overflow: hidden;
     }
     [data-testid="stForm"] .stNumberInput { margin-bottom: 0 !important; }
-    [data-testid="stForm"] .stNumberInput > div,
+    [data-testid="stForm"] .stNumberInput > div {
+        min-width: 0 !important; justify-content: center !important;
+    }
     [data-testid="stForm"] .stNumberInput > div > div { min-width: 0 !important; }
     [data-testid="stForm"] .stNumberInput > div > div > input {
         padding: 4px 2px !important; font-size: 1rem !important; height: 2rem !important;
-        min-width: 0 !important; width: 100% !important;
+        min-width: 0 !important; width: 100% !important; max-width: 3rem !important;
+        margin-left: auto !important; margin-right: auto !important;
         -moz-appearance: textfield !important;
     }
     [data-testid="stForm"] .stNumberInput > div > div > input::-webkit-outer-spin-button,
