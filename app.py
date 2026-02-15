@@ -149,6 +149,22 @@ with st.sidebar:
     if auth.is_logged_in():
         user = auth.get_current_user()
         st.write(f"Olá, **{user['username']}**!")
+        with st.expander("🔒 Alterar Senha"):
+            with st.form("sidebar_change_pw"):
+                cur_pw = st.text_input("Senha atual", type="password", key="sb_cur_pw")
+                new_pw = st.text_input("Nova senha", type="password", key="sb_new_pw")
+                new_pw2 = st.text_input("Confirmar", type="password", key="sb_new_pw2")
+                if st.form_submit_button("Alterar", use_container_width=True):
+                    stored = db.get_user_by_username(user["username"])
+                    if not auth.verify_password(cur_pw, stored["password_hash"]):
+                        st.error("Senha atual incorreta.")
+                    elif not new_pw or len(new_pw) < 4:
+                        st.error("Mínimo 4 caracteres.")
+                    elif new_pw != new_pw2:
+                        st.error("Senhas não coincidem.")
+                    else:
+                        db.reset_user_password(user["id"], auth.hash_password(new_pw))
+                        st.success("Senha alterada!")
         if st.button("Sair", use_container_width=True):
             auth.logout_user()
             st.rerun()
@@ -665,8 +681,8 @@ def page_admin():
         st.error("Acesso negado.")
         return
 
-    tab_add, tab_results, tab_scoring, tab_manage, tab_bets, tab_players = st.tabs([
-        "Adicionar Jogos", "Inserir Resultados", "Pontuação", "Gerenciar Jogos", "Palpites", "Jogadores"
+    tab_add, tab_results, tab_scoring, tab_manage, tab_bets, tab_players, tab_pw = st.tabs([
+        "Adicionar Jogos", "Inserir Resultados", "Pontuação", "Gerenciar Jogos", "Palpites", "Jogadores", "Minha Senha"
     ])
 
     LEAGUES = ["Brasileirão", "Premier League"]
@@ -902,6 +918,26 @@ def page_admin():
                             st.rerun()
                         else:
                             st.error("Não foi possível excluir este usuário.")
+
+    # --- Change Admin Password ---
+    with tab_pw:
+        st.subheader("Alterar Minha Senha")
+        admin_user = auth.get_current_user()
+        with st.form("change_admin_pw"):
+            cur_pw = st.text_input("Senha atual", type="password")
+            new_pw = st.text_input("Nova senha", type="password")
+            new_pw2 = st.text_input("Confirmar nova senha", type="password")
+            if st.form_submit_button("Alterar Senha", use_container_width=True):
+                stored = db.get_user_by_username(admin_user["username"])
+                if not auth.verify_password(cur_pw, stored["password_hash"]):
+                    st.error("Senha atual incorreta.")
+                elif not new_pw or len(new_pw) < 4:
+                    st.error("A nova senha deve ter pelo menos 4 caracteres.")
+                elif new_pw != new_pw2:
+                    st.error("As senhas não coincidem.")
+                else:
+                    db.reset_user_password(admin_user["id"], auth.hash_password(new_pw))
+                    st.success("Senha alterada com sucesso!")
 
 
 # ─── Router ───────────────────────────────────────────────────────────────────
