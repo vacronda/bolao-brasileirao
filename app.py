@@ -186,34 +186,25 @@ st.markdown("""
     [data-testid="stForm"] [data-testid="stVerticalBlockBorderWrapper"] { padding: 0 !important; }
     .compact-row-border { display: none; }
 
-    /* ── Mobile portrait: force columns to shrink into viewport ── */
+    /* ── Mobile portrait: let Streamlit's % widths work, shrink content ── */
     @media (max-width: 600px) {
         .block-container { padding-left: 0.3rem !important; padding-right: 0.3rem !important; }
-        [data-testid="stForm"] { padding: 0.3rem !important; overflow: hidden !important; }
+        [data-testid="stForm"] { padding: 0.3rem !important; }
 
         [data-testid="stForm"] [data-testid="stHorizontalBlock"] {
             gap: 0.15rem !important;
             padding: 5px 0 !important;
-            max-width: 100% !important;
         }
 
-        /* Kill Streamlit's inline width:calc() on ALL columns */
-        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"] {
-            width: auto !important; min-width: 0 !important;
+        /* Let columns shrink — don't override width, just remove min-width */
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] [data-testid="column"] {
+            min-width: 0 !important;
         }
-        /* Team columns: fill remaining space, truncate with ellipsis */
-        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1),
-        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(5) {
-            flex: 1 1 0 !important;
-        }
-        /* Input columns: fixed small size */
-        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2),
-        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) {
-            flex: 0 0 2.5rem !important;
-        }
-        /* X column: tiny fixed */
-        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) {
-            flex: 0 0 1rem !important;
+        /* Force ALL nested elements inside columns to shrink */
+        [data-testid="stForm"] [data-testid="column"] > div,
+        [data-testid="stForm"] [data-testid="column"] > div > div,
+        [data-testid="stForm"] [data-testid="column"] > div > div > div {
+            min-width: 0 !important;
         }
 
         .bet-date { display: none !important; }
@@ -223,10 +214,11 @@ st.markdown("""
         [data-testid="stForm"] .stNumberInput,
         [data-testid="stForm"] .stNumberInput > div,
         [data-testid="stForm"] .stNumberInput > div > div {
-            min-width: 0 !important; width: auto !important; max-width: 2.5rem !important;
+            min-width: 0 !important; max-width: 100% !important; width: 100% !important;
         }
         [data-testid="stForm"] .stNumberInput > div > div > input {
-            font-size: 0.85rem !important; height: 1.5rem !important; width: 2.2rem !important;
+            font-size: 0.85rem !important; height: 1.5rem !important;
+            width: 100% !important; max-width: 100% !important;
         }
     }
 </style>
