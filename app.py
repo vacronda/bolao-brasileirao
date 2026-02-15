@@ -135,21 +135,37 @@ st.markdown("""
 
     /* ── Compact betting form rows ──────────────────────────────── */
     .compact-bet-form [data-testid="stVerticalBlock"] { gap: 0rem !important; }
-    .compact-bet-form [data-testid="stHorizontalBlock"] { gap: 0.3rem !important; }
+    .compact-bet-form [data-testid="stHorizontalBlock"] {
+        gap: 0.25rem !important;
+        flex-wrap: nowrap !important;
+        flex-direction: row !important;
+        align-items: center !important;
+    }
+    .compact-bet-form [data-testid="stHorizontalBlock"] [data-testid="column"] {
+        min-width: 0 !important;
+        overflow: hidden;
+    }
     .compact-bet-form .stNumberInput { margin-bottom: 0; }
-    .compact-bet-form .stNumberInput > div > div > input { padding: 2px 1px; font-size: 0.9rem; height: 2rem; }
+    .compact-bet-form .stNumberInput > div > div > input {
+        padding: 2px 1px; font-size: 0.9rem; height: 1.8rem;
+        -moz-appearance: textfield;
+    }
+    .compact-bet-form .stNumberInput > div > div > input::-webkit-outer-spin-button,
+    .compact-bet-form .stNumberInput > div > div > input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .compact-bet-form .stNumberInput button { display: none !important; }
     .compact-bet-form .stMarkdown { margin-bottom: 0; }
+    .compact-bet-form .stMarkdown p { font-size: 0.82rem !important; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .compact-bet-form .stCaption { margin-bottom: 0; }
+    .compact-bet-form .stCaption p { font-size: 0.65rem !important; line-height: 1.1; }
     .compact-bet-form [data-testid="stVerticalBlock"] > [data-testid="stVerticalBlockBorderWrapper"] { padding: 0; }
+    .compact-bet-form .odds-row { display: none !important; }
+    .compact-bet-form .stMarkdown img { width: 16px !important; height: 16px !important; }
     .compact-row-border { border-bottom: 1px solid #e8e8e8; padding-bottom: 0; margin-bottom: 0; }
 
-    /* ── Mobile: hide odds, shrink text ────────────────────────── */
-    @media (max-width: 640px) {
-        .compact-bet-form .odds-row { display: none !important; }
-        .compact-bet-form .stCaption p { font-size: 0.62rem !important; line-height: 1.1; }
-        .compact-bet-form .stMarkdown p { font-size: 0.78rem !important; line-height: 1.2; }
-        .compact-bet-form .stMarkdown img { width: 16px !important; height: 16px !important; }
-        .compact-bet-form .stNumberInput > div > div > input { font-size: 0.85rem; height: 1.8rem; padding: 1px 0; }
+    /* ── Desktop: show odds ────────────────────────────────────── */
+    @media (min-width: 641px) {
+        .compact-bet-form .odds-row { display: flex !important; }
+        .compact-bet-form .stMarkdown img { width: 22px !important; height: 22px !important; }
     }
 </style>
 """, unsafe_allow_html=True)
