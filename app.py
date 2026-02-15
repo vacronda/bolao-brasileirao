@@ -267,6 +267,8 @@ st.markdown("""
 # ─── Init DB ───────────────────────────────────────────────────────────────────
 
 db.init_db()
+db.cleanup_old_sessions()
+auth.restore_session()
 
 # ─── Sidebar Navigation ───────────────────────────────────────────────────────
 

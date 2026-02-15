@@ -5,7 +5,8 @@ Falls back to local SQLite for development.
 """
 
 import os
-from datetime import datetime
+import secrets
+from datetime import datetime, timedelta
 from contextlib import contextmanager
 
 import streamlit as st
@@ -175,6 +176,13 @@ def init_db():
             """CREATE TABLE IF NOT EXISTS teams (
                 name TEXT PRIMARY KEY,
                 logo_url TEXT
+            )""",
+            """CREATE TABLE IF NOT EXISTS sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                token TEXT UNIQUE NOT NULL,
+                created_at TEXT DEFAULT (datetime('now')),
+                FOREIGN KEY (user_id) REFERENCES users(id)
             )""",
         ]
         for stmt in statements:
@@ -609,6 +617,44 @@ def get_team_logos(team_names: list[str]) -> dict[str, str]:
             ).fetchall()
         )
         return {r["name"]: r["logo_url"] for r in rows if r.get("logo_url")}
+
+
+# ─── Session operations ────────────────────────────────────────────────────
+
+def create_session(user_id: int) -> str:
+    """Create a new session token for the user and return it."""
+    token = secrets.token_urlsafe(32)
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO sessions (user_id, token) VALUES (?, ?)",
+            (user_id, token),
+        )
+    return token
+
+
+def get_session(token: str) -> dict | None:
+    """Look up a session token and return the associated user, or None."""
+    with get_conn() as conn:
+        row = conn.execute(
+            """SELECT u.* FROM sessions s
+               JOIN users u ON u.id = s.user_id
+               WHERE s.token = ?""",
+            (token,),
+        ).fetchone()
+        return _to_dict(row) if row else None
+
+
+def delete_session(token: str):
+    """Remove a session by token (logout)."""
+    with get_conn() as conn:
+        conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
+
+
+def cleanup_old_sessions(days: int = 30):
+    """Delete sessions older than the given number of days."""
+    with get_conn() as conn:
+        cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+        conn.execute("DELETE FROM sessions WHERE created_at < ?", (cutoff,))
 
 
 def get_leaderboard_evolution() -> list[dict]:
