@@ -166,22 +166,17 @@ st.markdown("""
     [data-testid="stForm"] [data-testid="stVerticalBlockBorderWrapper"] { padding: 0 !important; }
     .compact-row-border { border-bottom: 1px solid #e8e8e8; padding-bottom: 0; margin-bottom: 0; }
 
-    /* ── Mobile: hide date & saved cols, hide odds, shrink ────── */
+    /* ── Date label above team name ────────────────────────────── */
+    .bet-date { font-size: 0.65rem; color: #999; font-weight: 500; }
+
+    /* ── Mobile: hide odds & date, shrink everything ──────────── */
     @media (max-width: 768px) {
-        /* Hide col 1 (date) and col 7 (saved icon) */
-        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1),
-        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(7) {
-            display: none !important;
-        }
         [data-testid="stForm"] .odds-row { display: none !important; }
+        [data-testid="stForm"] .bet-date { display: none !important; }
         [data-testid="stForm"] .stMarkdown img { width: 14px !important; height: 14px !important; }
         [data-testid="stForm"] .stMarkdown p { font-size: 0.75rem !important; }
         [data-testid="stForm"] .stNumberInput > div > div > input {
             font-size: 0.85rem !important; height: 1.6rem !important; padding: 1px 0 !important;
-            width: 2.5rem !important;
-        }
-        [data-testid="stForm"] [data-testid="stHorizontalBlock"] {
-            padding: 2px 0 !important; min-height: 0 !important;
         }
         .compact-row-border { margin: 0 !important; padding: 0 !important; }
     }
@@ -445,38 +440,37 @@ def widget_upcoming_bets():
                 match_dt = datetime.fromisoformat(m["match_time"])
                 day_name = _weekday_pt(match_dt)
                 date_str = match_dt.strftime(f"%d/%m ({day_name}) %H:%M")
-                saved_icon = "✅" if existing else ""
+                saved_icon = " ✅" if existing else ""
                 home_val = existing["home_score"] if existing else 0
                 away_val = existing["away_score"] if existing else 0
                 odds = odds_map.get(m["id"])
                 odds_html = (
-                    f'<div class="odds-row" style="margin-top:2px;justify-content:flex-start;">'
+                    f'<span class="odds-row" style="margin-top:0;gap:3px;justify-content:flex-start;display:inline-flex;">'
                     f'<span class="odds-badge home">{odds["home_win"]:.2f}</span>'
                     f'<span class="odds-badge draw">{odds["draw"]:.2f}</span>'
                     f'<span class="odds-badge away">{odds["away_win"]:.2f}</span>'
-                    f'</div>'
+                    f'</span>'
                 ) if odds else ""
-                cols = st.columns([1.5, 2.5, 0.7, 0.3, 0.7, 2.5, 0.5])
-                cols[0].caption(date_str)
-                cols[0].markdown(odds_html, unsafe_allow_html=True)
-                cols[1].markdown(_team_md(m['home_team'], logos), unsafe_allow_html=True)
-                cols[2].number_input(
+                home_md = _team_md(m['home_team'], logos)
+                away_md = _team_md(m['away_team'], logos)
+                cols = st.columns([3, 1, 0.5, 1, 3])
+                cols[0].markdown(
+                    f'<span class="bet-date">{date_str}</span><br>{home_md} {odds_html}',
+                    unsafe_allow_html=True,
+                )
+                cols[1].number_input(
                     "H", min_value=0, max_value=20, value=home_val,
                     label_visibility="collapsed", key=f"hb_{m['id']}"
                 )
-                cols[3].markdown(
+                cols[2].markdown(
                     "<div style='text-align:center;padding-top:8px;font-weight:bold;'>x</div>",
                     unsafe_allow_html=True,
                 )
-                cols[4].number_input(
+                cols[3].number_input(
                     "A", min_value=0, max_value=20, value=away_val,
                     label_visibility="collapsed", key=f"ab_{m['id']}"
                 )
-                cols[5].markdown(_team_md(m['away_team'], logos), unsafe_allow_html=True)
-                cols[6].markdown(
-                    f"<div style='text-align:center;padding-top:6px;'>{saved_icon}</div>",
-                    unsafe_allow_html=True,
-                )
+                cols[4].markdown(f'{away_md}{saved_icon}', unsafe_allow_html=True)
                 open_match_ids.append(m["id"])
                 st.markdown('<div class="compact-row-border"></div>', unsafe_allow_html=True)
 
@@ -659,38 +653,37 @@ def page_bets():
                     match_dt = datetime.fromisoformat(m["match_time"])
                     existing = user_bets.get(m["id"])
                     date_str = match_dt.strftime("%d/%m %H:%M")
-                    saved_icon = "✅" if existing else ""
+                    saved_icon = " ✅" if existing else ""
                     home_val = existing["home_score"] if existing else 0
                     away_val = existing["away_score"] if existing else 0
                     odds = odds_map.get(m["id"])
                     odds_html = (
-                        f'<div class="odds-row" style="margin-top:2px;justify-content:flex-start;">'
+                        f'<span class="odds-row" style="margin-top:0;gap:3px;justify-content:flex-start;display:inline-flex;">'
                         f'<span class="odds-badge home">{odds["home_win"]:.2f}</span>'
                         f'<span class="odds-badge draw">{odds["draw"]:.2f}</span>'
                         f'<span class="odds-badge away">{odds["away_win"]:.2f}</span>'
-                        f'</div>'
+                        f'</span>'
                     ) if odds else ""
-                    cols = st.columns([1.5, 2.5, 0.7, 0.3, 0.7, 2.5, 0.5])
-                    cols[0].caption(date_str)
-                    cols[0].markdown(odds_html, unsafe_allow_html=True)
-                    cols[1].markdown(_team_md(m['home_team'], logos), unsafe_allow_html=True)
-                    cols[2].number_input(
+                    home_md = _team_md(m['home_team'], logos)
+                    away_md = _team_md(m['away_team'], logos)
+                    cols = st.columns([3, 1, 0.5, 1, 3])
+                    cols[0].markdown(
+                        f'<span class="bet-date">{date_str}</span><br>{home_md} {odds_html}',
+                        unsafe_allow_html=True,
+                    )
+                    cols[1].number_input(
                         "H", min_value=0, max_value=20, value=home_val,
                         label_visibility="collapsed", key=f"h_{m['id']}"
                     )
-                    cols[3].markdown(
+                    cols[2].markdown(
                         "<div style='text-align:center;padding-top:8px;'>x</div>",
                         unsafe_allow_html=True,
                     )
-                    cols[4].number_input(
+                    cols[3].number_input(
                         "A", min_value=0, max_value=20, value=away_val,
                         label_visibility="collapsed", key=f"a_{m['id']}"
                     )
-                    cols[5].markdown(_team_md(m['away_team'], logos), unsafe_allow_html=True)
-                    cols[6].markdown(
-                        f"<div style='text-align:center;padding-top:6px;'>{saved_icon}</div>",
-                        unsafe_allow_html=True,
-                    )
+                    cols[4].markdown(f'{away_md}{saved_icon}', unsafe_allow_html=True)
                     all_open_ids.append(m["id"])
                     st.markdown('<div class="compact-row-border"></div>', unsafe_allow_html=True)
 
