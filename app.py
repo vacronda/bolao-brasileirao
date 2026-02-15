@@ -196,7 +196,7 @@ st.markdown("""
             display: grid !important;
             grid-template-columns: 1fr auto 1fr !important;
             grid-template-rows: auto auto !important;
-            gap: 6px 4px !important;
+            gap: 4px 0 !important;
             background: #fff;
             border: 1px solid #e0e0e0;
             border-radius: 8px;
@@ -226,23 +226,26 @@ st.markdown("""
             align-items: flex-end !important;
         }
 
-        /* Row 2: Inputs + X */
+        /* Row 2: Inputs centered in their halves */
         [data-testid="stForm"] [data-testid="column"]:nth-of-type(2) {
             grid-row: 2; grid-column: 1 / 2;
-            justify-self: end;
+            justify-self: center; width: 100% !important;
+            display: flex; justify-content: center;
         }
         [data-testid="stForm"] [data-testid="column"]:nth-of-type(3) {
             grid-row: 2; grid-column: 2 / 3;
             align-self: center; justify-self: center;
+            font-size: 0.9rem; color: #999;
         }
         [data-testid="stForm"] [data-testid="column"]:nth-of-type(4) {
             grid-row: 2; grid-column: 3 / 4;
-            justify-self: start;
+            justify-self: center; width: 100% !important;
+            display: flex; justify-content: center;
         }
 
         .bet-date, .odds-row { display: none !important; }
         .compact-row-border { display: none !important; }
-        .team-name { font-size: 0.78rem; }
+        .team-name { font-size: 0.85rem; }
         .team-name img { width: 16px !important; height: 16px !important; margin-right: 3px !important; }
 
         [data-testid="stForm"] .stNumberInput > div { width: 100% !important; min-width: 0 !important; }
@@ -379,11 +382,12 @@ def _team_html(name: str, logos: dict[str, str], size: int = 22) -> str:
     return name
 
 
-def _team_md(name: str, logos: dict[str, str], size: int = 22) -> str:
-    """Return markdown-safe team name with optional crest image, wrapped in .team-name."""
+def _team_md(name: str, logos: dict[str, str], size: int = 22, suffix: str = "") -> str:
+    """Return markdown-safe team name with logo and optional suffix inside the div."""
     logo = logos.get(name, "")
-    img = f'<img src="{logo}" width="{size}" height="{size}" style="vertical-align:middle;margin-right:4px">' if logo else ""
-    return f'<div class="team-name">{img}<strong>{name}</strong></div>'
+    img = f'<img src="{logo}" width="{size}" height="{size}" style="vertical-align:middle;margin-right:6px">' if logo else ""
+    sfx = f'<span style="margin-left:4px;">{suffix}</span>' if suffix else ""
+    return f'<div class="team-name">{img}<span>{name}</span>{sfx}</div>'
 
 
 def _weekday_pt(dt: datetime) -> str:
@@ -507,7 +511,7 @@ def widget_upcoming_bets():
                 match_dt = datetime.fromisoformat(m["match_time"])
                 day_name = _weekday_pt(match_dt)
                 date_str = match_dt.strftime(f"%d/%m ({day_name}) %H:%M")
-                saved_icon = " ✅" if existing else ""
+                saved_icon = "✅" if existing else ""
                 home_val = existing["home_score"] if existing else 0
                 away_val = existing["away_score"] if existing else 0
                 odds = odds_map.get(m["id"])
@@ -519,7 +523,7 @@ def widget_upcoming_bets():
                     f'</span>'
                 ) if odds else ""
                 home_md = _team_md(m['home_team'], logos)
-                away_md = _team_md(m['away_team'], logos)
+                away_md = _team_md(m['away_team'], logos, suffix=saved_icon)
                 cols = st.columns([2.5, 1.2, 0.3, 1.2, 2.5])
                 cols[0].markdown(
                     f'<span class="bet-date">{date_str}</span>{home_md}{odds_html}',
@@ -537,7 +541,7 @@ def widget_upcoming_bets():
                     "A", min_value=0, max_value=20, value=away_val,
                     label_visibility="collapsed", key=f"ab_{m['id']}"
                 )
-                cols[4].markdown(f'{away_md}{saved_icon}', unsafe_allow_html=True)
+                cols[4].markdown(away_md, unsafe_allow_html=True)
                 open_match_ids.append(m["id"])
                 st.markdown('<div class="compact-row-border"></div>', unsafe_allow_html=True)
 
@@ -720,7 +724,7 @@ def page_bets():
                     match_dt = datetime.fromisoformat(m["match_time"])
                     existing = user_bets.get(m["id"])
                     date_str = match_dt.strftime("%d/%m %H:%M")
-                    saved_icon = " ✅" if existing else ""
+                    saved_icon = "✅" if existing else ""
                     home_val = existing["home_score"] if existing else 0
                     away_val = existing["away_score"] if existing else 0
                     odds = odds_map.get(m["id"])
@@ -732,7 +736,7 @@ def page_bets():
                         f'</span>'
                     ) if odds else ""
                     home_md = _team_md(m['home_team'], logos)
-                    away_md = _team_md(m['away_team'], logos)
+                    away_md = _team_md(m['away_team'], logos, suffix=saved_icon)
                     cols = st.columns([2.5, 1.2, 0.3, 1.2, 2.5])
                     cols[0].markdown(
                         f'<span class="bet-date">{date_str}</span>{home_md}{odds_html}',
@@ -750,7 +754,7 @@ def page_bets():
                         "A", min_value=0, max_value=20, value=away_val,
                         label_visibility="collapsed", key=f"a_{m['id']}"
                     )
-                    cols[4].markdown(f'{away_md}{saved_icon}', unsafe_allow_html=True)
+                    cols[4].markdown(away_md, unsafe_allow_html=True)
                     all_open_ids.append(m["id"])
                     st.markdown('<div class="compact-row-border"></div>', unsafe_allow_html=True)
 
