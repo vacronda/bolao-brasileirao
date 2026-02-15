@@ -403,22 +403,27 @@ def widget_upcoming_bets():
                 saved_icon = "✅" if existing else ""
                 home_val = existing["home_score"] if existing else 0
                 away_val = existing["away_score"] if existing else 0
+                odds = odds_map.get(m["id"])
+                home_odds = f'<span class="odds-badge home">{odds["home_win"]:.2f}</span>' if odds else ""
+                draw_odds = f'<span class="odds-badge draw">{odds["draw"]:.2f}</span>' if odds else ""
+                away_odds = f'<span class="odds-badge away">{odds["away_win"]:.2f}</span>' if odds else ""
                 cols = st.columns([1.5, 2.5, 0.7, 0.3, 0.7, 2.5, 0.5])
                 cols[0].caption(date_str)
-                cols[1].markdown(_team_md(m['home_team'], logos), unsafe_allow_html=True)
+                cols[1].markdown(f'{_team_md(m["home_team"], logos)} {home_odds}', unsafe_allow_html=True)
                 cols[2].number_input(
                     "H", min_value=0, max_value=20, value=home_val,
                     label_visibility="collapsed", key=f"hb_{m['id']}"
                 )
                 cols[3].markdown(
-                    "<div style='text-align:center;padding-top:8px;font-weight:bold;'>x</div>",
+                    f"<div style='text-align:center;padding-top:8px;font-weight:bold;'>x</div>"
+                    f"<div style='text-align:center;'>{draw_odds}</div>",
                     unsafe_allow_html=True,
                 )
                 cols[4].number_input(
                     "A", min_value=0, max_value=20, value=away_val,
                     label_visibility="collapsed", key=f"ab_{m['id']}"
                 )
-                cols[5].markdown(_team_md(m['away_team'], logos), unsafe_allow_html=True)
+                cols[5].markdown(f'{away_odds} {_team_md(m["away_team"], logos)}', unsafe_allow_html=True)
                 cols[6].markdown(
                     f"<div style='text-align:center;padding-top:6px;'>{saved_icon}</div>",
                     unsafe_allow_html=True,
@@ -610,19 +615,27 @@ def page_bets():
                     saved_icon = "✅" if existing else ""
                     home_val = existing["home_score"] if existing else 0
                     away_val = existing["away_score"] if existing else 0
+                    odds = odds_map.get(m["id"])
+                    home_odds = f'<span class="odds-badge home">{odds["home_win"]:.2f}</span>' if odds else ""
+                    draw_odds = f'<span class="odds-badge draw">{odds["draw"]:.2f}</span>' if odds else ""
+                    away_odds = f'<span class="odds-badge away">{odds["away_win"]:.2f}</span>' if odds else ""
                     cols = st.columns([1.5, 2.5, 0.7, 0.3, 0.7, 2.5, 0.5])
                     cols[0].caption(date_str)
-                    cols[1].markdown(_team_md(m['home_team'], logos), unsafe_allow_html=True)
+                    cols[1].markdown(f'{_team_md(m["home_team"], logos)} {home_odds}', unsafe_allow_html=True)
                     cols[2].number_input(
                         "H", min_value=0, max_value=20, value=home_val,
                         label_visibility="collapsed", key=f"h_{m['id']}"
                     )
-                    cols[3].markdown("<div style='text-align:center;padding-top:8px;'>x</div>", unsafe_allow_html=True)
+                    cols[3].markdown(
+                        f"<div style='text-align:center;padding-top:8px;'>x</div>"
+                        f"<div style='text-align:center;'>{draw_odds}</div>",
+                        unsafe_allow_html=True,
+                    )
                     cols[4].number_input(
                         "A", min_value=0, max_value=20, value=away_val,
                         label_visibility="collapsed", key=f"a_{m['id']}"
                     )
-                    cols[5].markdown(_team_md(m['away_team'], logos), unsafe_allow_html=True)
+                    cols[5].markdown(f'{away_odds} {_team_md(m["away_team"], logos)}', unsafe_allow_html=True)
                     cols[6].markdown(
                         f"<div style='text-align:center;padding-top:6px;'>{saved_icon}</div>",
                         unsafe_allow_html=True,
