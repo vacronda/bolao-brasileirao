@@ -271,31 +271,6 @@ st.markdown("""
 
 db.init_db()
 
-# ─── Shrink oversized base64 avatars (one-time per session) ───────────────────
-
-if "avatars_checked" not in st.session_state:
-    st.session_state["avatars_checked"] = True
-    _MAX_AVATAR_LEN = 15_000  # ~10 KB base64 ≈ ~7 KB image, plenty for 80px thumbnail
-    for _u in db.get_all_users():
-        _av = _u.get("avatar_url") or ""
-        if _av.startswith("data:") and len(_av) > _MAX_AVATAR_LEN:
-            try:
-                _header, _b64 = _av.split(",", 1)
-                _raw = base64.b64decode(_b64)
-                _img = Image.open(io.BytesIO(_raw)).convert("RGB")
-                _w, _h = _img.size
-                _side = min(_w, _h)
-                _left = (_w - _side) // 2
-                _top = (_h - _side) // 2
-                _img = _img.crop((_left, _top, _left + _side, _top + _side))
-                _img = _img.resize((80, 80), Image.LANCZOS)
-                _buf = io.BytesIO()
-                _img.save(_buf, format="JPEG", quality=70)
-                _small = f"data:image/jpeg;base64,{base64.b64encode(_buf.getvalue()).decode()}"
-                db.update_user_avatar(_u["id"], _small)
-            except Exception:
-                pass
-
 # ─── Sidebar Navigation ───────────────────────────────────────────────────────
 
 PAGES = ["Inicio", "Meus Palpites", "Classificacao"]
@@ -479,14 +454,16 @@ def _file_to_data_uri(uploaded_file, max_size: int = 80) -> str:
     return f"data:image/jpeg;base64,{b64}"
 
 
-def _avatar_img(entry: dict) -> str:
+def _avatar_img(entry: dict, avatars: dict[int, str] | None = None) -> str:
     """Return an <img> tag for the user's avatar or a generated initial-based fallback."""
-    url = (entry.get("avatar_url") or "").strip()
+    url = ""
+    if avatars is not None:
+        url = (avatars.get(entry["user_id"]) or "").strip()
+    else:
+        url = (entry.get("avatar_url") or "").strip()
     if url.startswith("data:"):
-        # base64 data URI — always valid
-        pass
+        pass  # base64 data URI — always valid
     elif url.startswith("http"):
-        # Only trust URLs that look like actual images
         _IMG_EXT = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp")
         _AVATAR_SERVICES = ("pravatar.cc", "ui-avatars.com", "gravatar.com", "avatars.githubusercontent.com", "lh3.googleusercontent.com")
         lower = url.lower().split("?")[0]
@@ -504,6 +481,7 @@ def _avatar_img(entry: dict) -> str:
 def widget_leaderboard_mini():
     """Show full leaderboard on the home page."""
     leaderboard = db.get_leaderboard()
+    avatars = db.get_user_avatars()
     current_user = auth.get_current_user() if auth.is_logged_in() else None
 
     if not leaderboard:
@@ -520,7 +498,7 @@ def widget_leaderboard_mini():
         row_class = "lb-me " if is_me else ""
         row_class += f"lb-top{rank}" if rank <= 3 else ""
         me_tag = " &#9668;" if is_me else ""
-        avatar = _avatar_img(entry)
+        avatar = _avatar_img(entry, avatars)
         rows_html += (
             f'<tr class="{row_class}">'
             f'<td class="lb-rank-cell">{medal}</td>'
@@ -889,6 +867,7 @@ def page_leaderboard():
     )
 
     leaderboard = db.get_leaderboard()
+    avatars = db.get_user_avatars()
     user = auth.get_current_user() if auth.is_logged_in() else None
 
     if not leaderboard:
@@ -916,7 +895,7 @@ def page_leaderboard():
         row_class = "lb-me " if is_me else ""
         row_class += f"lb-top{rank}" if rank <= 3 else ""
         me_tag = " &#9668;" if is_me else ""
-        avatar = _avatar_img(entry)
+        avatar = _avatar_img(entry, avatars)
         rows_html += (
             f'<tr class="{row_class}">'
             f'<td class="lb-rank-cell">{medal}</td>'
@@ -1191,11 +1170,36 @@ def page_admin():
         if not users:
             st.info("Nenhum jogador cadastrado.")
         else:
-            if st.button("🎲 Atribuir avatares de teste a todos", key="test_avatars"):
+            btn_cols = st.columns(2)
+            if btn_cols[0].button("🎲 Avatares de teste", key="test_avatars", use_container_width=True):
                 for u in users:
                     test_url = f"https://i.pravatar.cc/150?u={u['username']}"
                     db.update_user_avatar(u["id"], test_url)
                 st.success("Avatares de teste atribuídos!")
+                st.rerun()
+            if btn_cols[1].button("🗜️ Comprimir avatares", key="compress_avatars", use_container_width=True):
+                compressed = 0
+                for u in users:
+                    av = u.get("avatar_url") or ""
+                    if av.startswith("data:") and len(av) > 15_000:
+                        try:
+                            _header, _b64 = av.split(",", 1)
+                            raw = base64.b64decode(_b64)
+                            img = Image.open(io.BytesIO(raw)).convert("RGB")
+                            w, h = img.size
+                            side = min(w, h)
+                            left = (w - side) // 2
+                            top = (h - side) // 2
+                            img = img.crop((left, top, left + side, top + side))
+                            img = img.resize((80, 80), Image.LANCZOS)
+                            buf = io.BytesIO()
+                            img.save(buf, format="JPEG", quality=70)
+                            small = f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode()}"
+                            db.update_user_avatar(u["id"], small)
+                            compressed += 1
+                        except Exception:
+                            pass
+                st.success(f"{compressed} avatar(es) comprimido(s)!")
                 st.rerun()
             for u in users:
                 with st.expander(f"👤 {u['username']}"):

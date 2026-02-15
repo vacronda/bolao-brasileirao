@@ -462,7 +462,6 @@ def get_leaderboard() -> list[dict]:
             SELECT
                 u.id as user_id,
                 u.username,
-                u.avatar_url,
                 COALESCE(SUM(b.points_awarded), 0) as total_points,
                 COALESCE(SUM(CASE WHEN b.points_awarded = (
                     SELECT exact_score FROM scoring_config WHERE id = 1
@@ -477,6 +476,15 @@ def get_leaderboard() -> list[dict]:
             ORDER BY total_points DESC, exact_count DESC, u.username ASC
         """).fetchall()
         return _to_dicts(rows)
+
+
+def get_user_avatars() -> dict[int, str]:
+    """Return {user_id: avatar_url} for all users that have an avatar."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, avatar_url FROM users WHERE avatar_url IS NOT NULL AND avatar_url <> ''"
+        ).fetchall()
+        return {r["id"]: r["avatar_url"] for r in (_to_dicts(rows))}
 
 
 # ─── Scoring config ───────────────────────────────────────────────────────────
