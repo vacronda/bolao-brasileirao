@@ -405,23 +405,18 @@ def _weekday_pt(dt: datetime) -> str:
     return days[dt.weekday()]
 
 
-_FALLBACK_BALLS = [
-    "https://em-content.zobj.net/source/apple/391/soccer-ball_26bd.png",
-    "https://em-content.zobj.net/source/google/387/soccer-ball_26bd.png",
-    "https://em-content.zobj.net/source/samsung/349/soccer-ball_26bd.png",
-    "https://em-content.zobj.net/source/microsoft/379/soccer-ball_26bd.png",
-    "https://em-content.zobj.net/source/facebook/355/soccer-ball_26bd.png",
-    "https://em-content.zobj.net/source/twitter/376/soccer-ball_26bd.png",
-]
+_AVATAR_COLORS = ["0D8ABC", "E17055", "00B894", "6C5CE7", "FDCB6E", "E84393", "00CEC9", "D63031"]
 
 
 def _avatar_img(entry: dict) -> str:
-    """Return an <img> tag for the user's avatar or a deterministic fallback ball."""
-    fallback = _FALLBACK_BALLS[entry["user_id"] % len(_FALLBACK_BALLS)]
+    """Return an <img> tag for the user's avatar or a generated initial-based fallback."""
     url = entry.get("avatar_url") or ""
-    if not url:
-        url = fallback
-    return f'<img class="lb-avatar" src="{url}" onerror="this.onerror=null;this.src=\'{fallback}\'" alt="">'
+    if not url or not url.startswith("http"):
+        # Generate a deterministic avatar from initials
+        name = entry.get("username", "?")
+        color = _AVATAR_COLORS[entry["user_id"] % len(_AVATAR_COLORS)]
+        url = f"https://ui-avatars.com/api/?name={name}&background={color}&color=fff&size=52&bold=true&format=png"
+    return f'<img class="lb-avatar" src="{url}" alt="">'
 
 
 def widget_leaderboard_mini():
@@ -1114,6 +1109,12 @@ def page_admin():
         if not users:
             st.info("Nenhum jogador cadastrado.")
         else:
+            if st.button("🎲 Atribuir avatares de teste a todos", key="test_avatars"):
+                for u in users:
+                    test_url = f"https://i.pravatar.cc/150?u={u['username']}"
+                    db.update_user_avatar(u["id"], test_url)
+                st.success("Avatares de teste atribuídos!")
+                st.rerun()
             for u in users:
                 with st.expander(f"👤 {u['username']}"):
                     current_avatar = u.get("avatar_url") or ""
