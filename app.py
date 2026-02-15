@@ -186,12 +186,12 @@ st.markdown("""
     [data-testid="stForm"] [data-testid="stVerticalBlockBorderWrapper"] { padding: 0 !important; }
     .compact-row-border { display: none; }
 
-    /* ── Mobile portrait: CSS Grid card layout (nuclear option) ── */
+    /* ── Mobile portrait: CSS Grid card layout ─────────────────── */
     @media (max-width: 600px) {
         .block-container { padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
         [data-testid="stForm"] { padding: 0.3rem !important; }
 
-        /* Transform row into a 3-column grid card */
+        /* Transform row into a 3-column, 2-row grid card */
         [data-testid="stForm"] [data-testid="stHorizontalBlock"] {
             display: grid !important;
             grid-template-columns: 1fr auto 1fr !important;
@@ -205,42 +205,45 @@ st.markdown("""
             box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
 
-        /* Reset all columns */
-        [data-testid="stForm"] [data-testid="column"] {
+        /* Reset ALL direct children (columns or wrappers) */
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > * {
             width: auto !important; flex: unset !important; min-width: 0 !important;
         }
 
-        /* Row 1: Team names */
-        [data-testid="stForm"] [data-testid="column"]:nth-of-type(1) {
+        /* Column 1 (Home team) → Row 1, Left */
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > :nth-child(1) {
             grid-row: 1; grid-column: 1 / 2;
             justify-self: start; width: 100% !important;
         }
-        [data-testid="stForm"] [data-testid="column"]:nth-of-type(5) {
-            grid-row: 1; grid-column: 3 / 4;
-            justify-self: end; width: 100% !important;
-        }
-        [data-testid="stForm"] [data-testid="column"]:nth-of-type(5) .team-name {
-            justify-content: flex-end;
-        }
-        [data-testid="stForm"] [data-testid="column"]:nth-of-type(5) > div {
-            align-items: flex-end !important;
-        }
-
-        /* Row 2: Inputs centered in their halves */
-        [data-testid="stForm"] [data-testid="column"]:nth-of-type(2) {
+        /* Column 2 (Home score) → Row 2, Left */
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > :nth-child(2) {
             grid-row: 2; grid-column: 1 / 2;
-            justify-self: center; width: 100% !important;
+            justify-self: center; width: auto !important;
             display: flex; justify-content: center;
         }
-        [data-testid="stForm"] [data-testid="column"]:nth-of-type(3) {
+        /* Column 3 (x) → Row 2, Center */
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > :nth-child(3) {
             grid-row: 2; grid-column: 2 / 3;
             align-self: center; justify-self: center;
             font-size: 0.9rem; color: #999;
         }
-        [data-testid="stForm"] [data-testid="column"]:nth-of-type(4) {
+        /* Column 4 (Away score) → Row 2, Right */
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > :nth-child(4) {
             grid-row: 2; grid-column: 3 / 4;
-            justify-self: center; width: 100% !important;
+            justify-self: center; width: auto !important;
             display: flex; justify-content: center;
+        }
+        /* Column 5 (Away team) → Row 1, Right */
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > :nth-child(5) {
+            grid-row: 1; grid-column: 3 / 4;
+            justify-self: end; width: 100% !important;
+        }
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > :nth-child(5) .team-name {
+            justify-content: flex-end;
+        }
+        /* "vs" text — Row 1, Center */
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > :nth-child(3) {
+            grid-row: 2; grid-column: 2 / 3;
         }
 
         .bet-date, .odds-row { display: none !important; }
