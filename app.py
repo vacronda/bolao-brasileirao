@@ -186,39 +186,38 @@ st.markdown("""
     [data-testid="stForm"] [data-testid="stVerticalBlockBorderWrapper"] { padding: 0 !important; }
     .compact-row-border { display: none; }
 
-    /* ── Mobile portrait: card layout with flex ordering ─────── */
+    /* ── Mobile portrait: CSS Grid card layout (nuclear option) ── */
     @media (max-width: 600px) {
         .block-container { padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
         [data-testid="stForm"] { padding: 0.3rem !important; }
 
-        /* Turn each row into a wrapping card */
+        /* Transform row into a 3-column grid card */
         [data-testid="stForm"] [data-testid="stHorizontalBlock"] {
-            display: flex !important;
-            flex-wrap: wrap !important;
-            gap: 0 !important;
-            padding: 10px 8px !important;
-            margin-bottom: 10px !important;
+            display: grid !important;
+            grid-template-columns: 1fr auto 1fr !important;
+            grid-template-rows: auto auto !important;
+            gap: 6px 4px !important;
             background: #fff;
             border: 1px solid #e0e0e0;
             border-radius: 8px;
+            padding: 10px 8px !important;
+            margin-bottom: 10px !important;
             box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
 
-        /* Nuke ALL Streamlit column defaults first */
+        /* Reset all columns */
         [data-testid="stForm"] [data-testid="column"] {
-            flex: unset !important;
-            width: unset !important;
-            min-width: 0 !important;
+            width: auto !important; flex: unset !important; min-width: 0 !important;
         }
 
-        /* Home Team (Col 1) → top-left */
+        /* Row 1: Team names */
         [data-testid="stForm"] [data-testid="column"]:nth-of-type(1) {
-            order: 1; width: 50% !important; margin-bottom: 8px;
+            grid-row: 1; grid-column: 1 / 2;
+            justify-self: start; width: 100% !important;
         }
-
-        /* Away Team (Col 5) → top-right */
         [data-testid="stForm"] [data-testid="column"]:nth-of-type(5) {
-            order: 2; width: 50% !important; margin-bottom: 8px;
+            grid-row: 1; grid-column: 3 / 4;
+            justify-self: end; width: 100% !important;
         }
         [data-testid="stForm"] [data-testid="column"]:nth-of-type(5) .team-name {
             justify-content: flex-end;
@@ -227,31 +226,25 @@ st.markdown("""
             align-items: flex-end !important;
         }
 
-        /* Home Input (Col 2) → bottom-left */
+        /* Row 2: Inputs + X */
         [data-testid="stForm"] [data-testid="column"]:nth-of-type(2) {
-            order: 3; width: 40% !important;
-            display: flex; justify-content: flex-end;
+            grid-row: 2; grid-column: 1 / 2;
+            justify-self: end;
         }
-
-        /* X separator (Col 3) → bottom-center */
         [data-testid="stForm"] [data-testid="column"]:nth-of-type(3) {
-            order: 4; width: 20% !important;
-            display: flex; justify-content: center; align-items: center;
+            grid-row: 2; grid-column: 2 / 3;
+            align-self: center; justify-self: center;
         }
-
-        /* Away Input (Col 4) → bottom-right */
         [data-testid="stForm"] [data-testid="column"]:nth-of-type(4) {
-            order: 5; width: 40% !important;
-            display: flex; justify-content: flex-start;
+            grid-row: 2; grid-column: 3 / 4;
+            justify-self: start;
         }
 
-        .bet-date { display: none !important; }
-        [data-testid="stForm"] .odds-row { display: none !important; }
+        .bet-date, .odds-row { display: none !important; }
         .compact-row-border { display: none !important; }
         .team-name { font-size: 0.78rem; }
         .team-name img { width: 16px !important; height: 16px !important; margin-right: 3px !important; }
 
-        /* Ensure input container respects column width */
         [data-testid="stForm"] .stNumberInput > div { width: 100% !important; min-width: 0 !important; }
         [data-testid="stForm"] .stNumberInput > div > div { min-width: 0 !important; }
     }
