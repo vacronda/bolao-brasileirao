@@ -186,40 +186,75 @@ st.markdown("""
     [data-testid="stForm"] [data-testid="stVerticalBlockBorderWrapper"] { padding: 0 !important; }
     .compact-row-border { display: none; }
 
-    /* ── Mobile portrait: let Streamlit's % widths work, shrink content ── */
+    /* ── Mobile portrait: card layout with flex ordering ─────── */
     @media (max-width: 600px) {
-        .block-container { padding-left: 0.3rem !important; padding-right: 0.3rem !important; }
+        .block-container { padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
         [data-testid="stForm"] { padding: 0.3rem !important; }
 
+        /* Turn each row into a wrapping card */
         [data-testid="stForm"] [data-testid="stHorizontalBlock"] {
-            gap: 0.15rem !important;
-            padding: 5px 0 !important;
+            flex-wrap: wrap !important;
+            gap: 0 !important;
+            padding: 10px 8px !important;
+            margin-bottom: 8px !important;
+            background: #fff;
+            border: 1px solid #e8e8e8;
+            border-radius: 8px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.04);
         }
 
-        /* Let columns shrink — don't override width, just remove min-width */
-        [data-testid="stForm"] [data-testid="stHorizontalBlock"] [data-testid="column"] {
+        /* Home Team (Col 1) → top-left */
+        [data-testid="stForm"] [data-testid="column"]:nth-of-type(1) {
+            order: 1 !important;
+            width: 50% !important; flex: 0 0 50% !important; max-width: 50% !important;
             min-width: 0 !important;
         }
-        /* Force ALL nested elements inside columns to shrink */
-        [data-testid="stForm"] [data-testid="column"] > div,
-        [data-testid="stForm"] [data-testid="column"] > div > div,
-        [data-testid="stForm"] [data-testid="column"] > div > div > div {
+        [data-testid="stForm"] [data-testid="column"]:nth-of-type(1) .team-name {
+            justify-content: flex-start;
+        }
+
+        /* Away Team (Col 5) → top-right */
+        [data-testid="stForm"] [data-testid="column"]:nth-of-type(5) {
+            order: 2 !important;
+            width: 50% !important; flex: 0 0 50% !important; max-width: 50% !important;
             min-width: 0 !important;
+        }
+        [data-testid="stForm"] [data-testid="column"]:nth-of-type(5) .team-name {
+            justify-content: flex-end;
+        }
+
+        /* Home Input (Col 2) → bottom-left */
+        [data-testid="stForm"] [data-testid="column"]:nth-of-type(2) {
+            order: 3 !important;
+            width: 35% !important; flex: 0 0 35% !important; max-width: 35% !important;
+            min-width: 0 !important; margin-top: 6px !important;
+            display: flex !important; justify-content: flex-end !important;
+        }
+
+        /* X separator (Col 3) → bottom-center */
+        [data-testid="stForm"] [data-testid="column"]:nth-of-type(3) {
+            order: 4 !important;
+            width: 10% !important; flex: 0 0 10% !important; max-width: 10% !important;
+            min-width: 0 !important; margin-top: 6px !important;
+            display: flex !important; justify-content: center !important; align-items: center !important;
+        }
+
+        /* Away Input (Col 4) → bottom-right */
+        [data-testid="stForm"] [data-testid="column"]:nth-of-type(4) {
+            order: 5 !important;
+            width: 35% !important; flex: 0 0 35% !important; max-width: 35% !important;
+            min-width: 0 !important; margin-top: 6px !important;
+            display: flex !important; justify-content: flex-start !important;
         }
 
         .bet-date { display: none !important; }
         [data-testid="stForm"] .odds-row { display: none !important; }
-        .team-name { font-size: 0.72rem; }
-        .team-name img { width: 14px !important; height: 14px !important; margin-right: 2px !important; }
-        [data-testid="stForm"] .stNumberInput,
-        [data-testid="stForm"] .stNumberInput > div,
-        [data-testid="stForm"] .stNumberInput > div > div {
-            min-width: 0 !important; max-width: 100% !important; width: 100% !important;
-        }
-        [data-testid="stForm"] .stNumberInput > div > div > input {
-            font-size: 0.85rem !important; height: 1.5rem !important;
-            width: 100% !important; max-width: 100% !important;
-        }
+        .team-name { font-size: 0.78rem; }
+        .team-name img { width: 16px !important; height: 16px !important; margin-right: 3px !important; }
+
+        /* Ensure inputs don't overflow */
+        [data-testid="stForm"] .stNumberInput > div { width: 100% !important; min-width: 0 !important; }
+        [data-testid="stForm"] .stNumberInput > div > div { min-width: 0 !important; }
     }
 </style>
 """, unsafe_allow_html=True)
