@@ -242,6 +242,28 @@ def get_all_users() -> list[dict]:
         return _to_dicts(rows)
 
 
+def delete_user(user_id: int) -> bool:
+    """Delete a user and all their bets. Refuses to delete admins."""
+    with get_conn() as conn:
+        user = _to_dict(
+            conn.execute("SELECT is_admin FROM users WHERE id = ?", (user_id,)).fetchone()
+        )
+        if not user or user["is_admin"]:
+            return False
+        conn.execute("DELETE FROM bets WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        return True
+
+
+def reset_user_password(user_id: int, new_password_hash: str):
+    """Update a user's password hash."""
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE users SET password_hash = ? WHERE id = ?",
+            (new_password_hash, user_id),
+        )
+
+
 # ─── Match operations ─────────────────────────────────────────────────────────
 
 def add_match(round_number: int, home_team: str, away_team: str, match_time: str, league: str = "Brasileirão") -> int:

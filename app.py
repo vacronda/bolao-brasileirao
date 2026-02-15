@@ -665,8 +665,8 @@ def page_admin():
         st.error("Acesso negado.")
         return
 
-    tab_add, tab_results, tab_scoring, tab_manage, tab_bets = st.tabs([
-        "Adicionar Jogos", "Inserir Resultados", "Pontuação", "Gerenciar Jogos", "Palpites"
+    tab_add, tab_results, tab_scoring, tab_manage, tab_bets, tab_players = st.tabs([
+        "Adicionar Jogos", "Inserir Resultados", "Pontuação", "Gerenciar Jogos", "Palpites", "Jogadores"
     ])
 
     LEAGUES = ["Brasileirão", "Premier League"]
@@ -874,6 +874,34 @@ def page_admin():
                         db.admin_upsert_bet(sel_user, selected_id, int(new_h), int(new_a))
                         st.success("Palpite adicionado!")
                         st.rerun()
+
+    # --- Manage Players ---
+    with tab_players:
+        st.subheader("Gerenciar Jogadores")
+        users = [u for u in db.get_all_users() if not u["is_admin"]]
+        if not users:
+            st.info("Nenhum jogador cadastrado.")
+        else:
+            for u in users:
+                with st.expander(f"👤 {u['username']}"):
+                    with st.form(key=f"reset_pw_{u['id']}"):
+                        new_pw = st.text_input(
+                            "Nova senha", type="password", key=f"pw_input_{u['id']}"
+                        )
+                        if st.form_submit_button("Redefinir Senha", use_container_width=True):
+                            if not new_pw or len(new_pw) < 4:
+                                st.error("A senha deve ter pelo menos 4 caracteres.")
+                            else:
+                                hashed = auth.hash_password(new_pw)
+                                db.reset_user_password(u["id"], hashed)
+                                st.success(f"Senha de {u['username']} redefinida!")
+                    if st.button(f"🗑️ Excluir {u['username']}", key=f"del_user_{u['id']}"):
+                        ok = db.delete_user(u["id"])
+                        if ok:
+                            st.success(f"Jogador {u['username']} excluído.")
+                            st.rerun()
+                        else:
+                            st.error("Não foi possível excluir este usuário.")
 
 
 # ─── Router ───────────────────────────────────────────────────────────────────
