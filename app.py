@@ -342,69 +342,95 @@ def widget_upcoming_bets():
         lg = m.get("league", "Brasileirão")
         by_league.setdefault(lg, []).append(m)
 
+    # Render locked matches outside the form
+    locked_matches = []
+    open_matches = []
     for league, matches in sorted(by_league.items()):
-        flag = "🇧🇷" if "Brasil" in league else "🏴󠁧󠁢󠁥󠁮󠁧󠁿"
         css_class = "brasileirao" if "Brasil" in league else "premier"
-        st.markdown(f'<div class="league-label {css_class}">{flag} {league}</div>', unsafe_allow_html=True)
-
         for m in matches:
             match_dt = datetime.fromisoformat(m["match_time"])
-            is_locked = now >= match_dt
-            existing = user_bets.get(m["id"])
-            day_name = _weekday_pt(match_dt)
-            date_str = match_dt.strftime(f"%d/%m ({day_name}) %H:%M")
+            if now >= match_dt:
+                locked_matches.append((league, css_class, m))
+            else:
+                open_matches.append((league, css_class, m))
 
-            if is_locked:
-                if existing:
-                    score_txt = f"{existing['home_score']} x {existing['away_score']}"
-                else:
-                    score_txt = "- x -"
+    # Show locked matches first
+    current_league = None
+    for league, css_class, m in locked_matches:
+        if league != current_league:
+            flag = "🇧🇷" if "Brasil" in league else "🏴󠁧󠁢󠁥󠁮󠁧󠁿"
+            st.markdown(f'<div class="league-label {css_class}">{flag} {league}</div>', unsafe_allow_html=True)
+            current_league = league
+        existing = user_bets.get(m["id"])
+        match_dt = datetime.fromisoformat(m["match_time"])
+        day_name = _weekday_pt(match_dt)
+        date_str = match_dt.strftime(f"%d/%m ({day_name}) %H:%M")
+        score_txt = f"{existing['home_score']} x {existing['away_score']}" if existing else "- x -"
+        odds = odds_map.get(m["id"])
+        home_html = _team_html(m["home_team"], logos)
+        away_html = _team_html(m["away_team"], logos)
+        st.markdown(
+            f'<div class="match-card {css_class} locked">'
+            f'<div><span class="mc-teams">🔒 {home_html} {score_txt} {away_html}</span>'
+            f'{_odds_html(odds)}</div>'
+            f'<span class="mc-meta">{date_str}</span>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+    # Show open matches inside a single form
+    if open_matches:
+        with st.form(key="home_bet_all"):
+            open_match_ids = []
+            current_league = None
+            for league, css_class, m in open_matches:
+                if league != current_league:
+                    flag = "🇧🇷" if "Brasil" in league else "🏴󠁧󠁢󠁥󠁮󠁧󠁿"
+                    st.markdown(f'<div class="league-label {css_class}">{flag} {league}</div>', unsafe_allow_html=True)
+                    current_league = league
+                existing = user_bets.get(m["id"])
+                match_dt = datetime.fromisoformat(m["match_time"])
+                day_name = _weekday_pt(match_dt)
+                date_str = match_dt.strftime(f"%d/%m ({day_name}) %H:%M")
                 odds = odds_map.get(m["id"])
-                home_html = _team_html(m["home_team"], logos)
-                away_html = _team_html(m["away_team"], logos)
-                st.markdown(
-                    f'<div class="match-card {css_class} locked">'
-                    f'<div><span class="mc-teams">🔒 {home_html} {score_txt} {away_html}</span>'
-                    f'{_odds_html(odds)}</div>'
-                    f'<span class="mc-meta">{date_str}</span>'
-                    f'</div>',
+                st.caption(f"R{m['round_number'] or '?'} · {date_str}")
+                if odds:
+                    st.markdown(_odds_html(odds), unsafe_allow_html=True)
+                cols = st.columns([3, 1, 0.5, 1, 3])
+                cols[0].markdown(_team_md(m['home_team'], logos), unsafe_allow_html=True)
+                home_val = existing["home_score"] if existing else 0
+                away_val = existing["away_score"] if existing else 0
+                cols[1].number_input(
+                    "H", min_value=0, max_value=20, value=home_val,
+                    label_visibility="collapsed", key=f"hb_{m['id']}"
+                )
+                cols[2].markdown(
+                    "<div style='text-align:center;padding-top:8px;font-weight:bold;'>x</div>",
                     unsafe_allow_html=True,
                 )
-            else:
-                odds = odds_map.get(m["id"])
-                with st.form(key=f"home_bet_{m['id']}"):
-                    st.caption(f"R{m['round_number'] or '?'} · {date_str}")
-                    if odds:
-                        st.markdown(_odds_html(odds), unsafe_allow_html=True)
-                    cols = st.columns([3, 1, 0.5, 1, 3])
-                    cols[0].markdown(_team_md(m['home_team'], logos), unsafe_allow_html=True)
-                    home_val = existing["home_score"] if existing else 0
-                    away_val = existing["away_score"] if existing else 0
-                    home_score = cols[1].number_input(
-                        "H", min_value=0, max_value=20, value=home_val,
-                        label_visibility="collapsed", key=f"hb_{m['id']}"
-                    )
-                    cols[2].markdown(
-                        "<div style='text-align:center;padding-top:8px;font-weight:bold;'>x</div>",
-                        unsafe_allow_html=True,
-                    )
-                    away_score = cols[3].number_input(
-                        "A", min_value=0, max_value=20, value=away_val,
-                        label_visibility="collapsed", key=f"ab_{m['id']}"
-                    )
-                    cols[4].markdown(_team_md(m['away_team'], logos), unsafe_allow_html=True)
+                cols[3].number_input(
+                    "A", min_value=0, max_value=20, value=away_val,
+                    label_visibility="collapsed", key=f"ab_{m['id']}"
+                )
+                cols[4].markdown(_team_md(m['away_team'], logos), unsafe_allow_html=True)
+                if existing:
+                    st.caption("✅ Salvo")
+                open_match_ids.append(m["id"])
+                st.markdown("---")
 
-                    col_btn, col_status = st.columns([1, 1])
-                    submitted = col_btn.form_submit_button("Salvar", use_container_width=True)
-                    if existing:
-                        col_status.success("✅ Salvo")
-
-                    if submitted:
-                        ok = db.upsert_bet(user["id"], m["id"], int(home_score), int(away_score))
-                        if ok:
-                            st.rerun()
-                        else:
-                            st.error("Não foi possível salvar. A partida pode já ter começado.")
+            if st.form_submit_button("Salvar Todos", use_container_width=True):
+                errors = []
+                for mid in open_match_ids:
+                    h = int(st.session_state.get(f"hb_{mid}", 0))
+                    a = int(st.session_state.get(f"ab_{mid}", 0))
+                    ok = db.upsert_bet(user["id"], mid, h, a)
+                    if not ok:
+                        errors.append(mid)
+                if errors:
+                    st.error(f"{len(errors)} palpite(s) não salvos (partida já começou?).")
+                else:
+                    st.success("Todos os palpites salvos!")
+                st.rerun()
 
 
 # ─── Page: Home ──────────────────────────────────────────────────────────────
@@ -560,18 +586,19 @@ def page_bets():
             r = m.get("round_number") or 0
             rounds.setdefault(r, []).append(m)
 
-        for round_num in sorted(rounds.keys()):
-            round_matches = rounds[round_num]
-            label = f"Rodada {round_num}" if round_num else "Sem rodada definida"
-            st.subheader(label)
+        with st.form(key="bet_all"):
+            all_open_ids = []
+            for round_num in sorted(rounds.keys()):
+                round_matches = rounds[round_num]
+                label = f"Rodada {round_num}" if round_num else "Sem rodada definida"
+                st.subheader(label)
 
-            for m in round_matches:
-                match_dt = datetime.fromisoformat(m["match_time"])
-                existing = user_bets.get(m["id"])
-                date_str = match_dt.strftime("%d/%m %H:%M")
-                odds = odds_map.get(m["id"])
+                for m in round_matches:
+                    match_dt = datetime.fromisoformat(m["match_time"])
+                    existing = user_bets.get(m["id"])
+                    date_str = match_dt.strftime("%d/%m %H:%M")
+                    odds = odds_map.get(m["id"])
 
-                with st.form(key=f"bet_{m['id']}"):
                     st.markdown(f"**{date_str}**")
                     if odds:
                         st.markdown(_odds_html(odds), unsafe_allow_html=True)
@@ -579,30 +606,34 @@ def page_bets():
                     cols[0].markdown(_team_md(m['home_team'], logos), unsafe_allow_html=True)
                     home_val = existing["home_score"] if existing else 0
                     away_val = existing["away_score"] if existing else 0
-                    home_score = cols[1].number_input(
+                    cols[1].number_input(
                         "H", min_value=0, max_value=20, value=home_val,
                         label_visibility="collapsed", key=f"h_{m['id']}"
                     )
                     cols[2].markdown("<div style='text-align:center;padding-top:8px;'>x</div>", unsafe_allow_html=True)
-                    away_score = cols[3].number_input(
+                    cols[3].number_input(
                         "A", min_value=0, max_value=20, value=away_val,
                         label_visibility="collapsed", key=f"a_{m['id']}"
                     )
                     cols[4].markdown(_team_md(m['away_team'], logos), unsafe_allow_html=True)
-
-                    col_btn, col_status = st.columns([1, 1])
-                    submitted = col_btn.form_submit_button("Salvar", use_container_width=True)
                     if existing:
-                        col_status.success("✅ Salvo")
+                        st.caption("✅ Salvo")
+                    all_open_ids.append(m["id"])
+                    st.markdown("---")
 
-                    if submitted:
-                        ok = db.upsert_bet(user["id"], m["id"], int(home_score), int(away_score))
-                        if ok:
-                            st.rerun()
-                        else:
-                            st.error("Não foi possível salvar. A partida pode já ter começado.")
-
-            st.divider()
+            if st.form_submit_button("Salvar Todos", use_container_width=True):
+                errors = []
+                for mid in all_open_ids:
+                    h = int(st.session_state.get(f"h_{mid}", 0))
+                    a = int(st.session_state.get(f"a_{mid}", 0))
+                    ok = db.upsert_bet(user["id"], mid, h, a)
+                    if not ok:
+                        errors.append(mid)
+                if errors:
+                    st.error(f"{len(errors)} palpite(s) não salvos (partida já começou?).")
+                else:
+                    st.success("Todos os palpites salvos!")
+                st.rerun()
 
 
 # ─── Page: Leaderboard ────────────────────────────────────────────────────────
