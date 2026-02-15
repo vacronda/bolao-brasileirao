@@ -136,12 +136,16 @@ st.markdown("""
     /* ── Team name (truncates on overflow) ─────────────────────── */
     .team-name {
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        display: block; font-size: 0.9rem; line-height: 1.4;
+        display: flex; align-items: center;
+        font-size: 0.95rem; line-height: 1.4; font-weight: 600; color: #222;
     }
-    .team-name img { vertical-align: middle; margin-right: 4px; }
+    .team-name img { flex-shrink: 0; margin-right: 6px; width: 22px; height: 22px; }
 
     /* ── Date label above team name ────────────────────────────── */
-    .bet-date { font-size: 0.65rem; color: #999; font-weight: 500; display: block; margin-bottom: 1px; }
+    .bet-date {
+        font-size: 0.7rem; color: #888; font-weight: 600;
+        display: block; margin-bottom: 4px;
+    }
 
     /* ── Compact betting form rows ──────────────────────────────── */
     [data-testid="stForm"] [data-testid="stVerticalBlock"] { gap: 0.25rem !important; }
@@ -150,6 +154,9 @@ st.markdown("""
         flex-wrap: nowrap !important;
         flex-direction: row !important;
         align-items: center !important;
+        padding-top: 10px !important;
+        padding-bottom: 8px !important;
+        border-bottom: 1px solid #f0f0f0;
     }
     [data-testid="stForm"] [data-testid="stHorizontalBlock"] [data-testid="column"] {
         min-width: 0 !important; overflow: hidden;
@@ -160,7 +167,9 @@ st.markdown("""
     }
     [data-testid="stForm"] .stNumberInput > div > div { min-width: 0 !important; }
     [data-testid="stForm"] .stNumberInput > div > div > input {
-        padding: 4px 2px !important; font-size: 1rem !important; height: 2rem !important;
+        text-align: center !important;
+        padding: 0 !important; font-size: 1.1rem !important; font-weight: 700 !important;
+        height: 2.2rem !important;
         min-width: 0 !important; width: 100% !important; max-width: 3rem !important;
         margin-left: auto !important; margin-right: auto !important;
         -moz-appearance: textfield !important;
@@ -172,42 +181,51 @@ st.markdown("""
     [data-testid="stForm"] .stNumberInput button { display: none !important; }
     [data-testid="stForm"] .stMarkdown { margin-bottom: 0 !important; }
     [data-testid="stForm"] [data-testid="stVerticalBlockBorderWrapper"] { padding: 0 !important; }
-    .compact-row-border { border-bottom: 1px solid #e8e8e8; padding: 2px 0; margin: 0; }
+    .compact-row-border { display: none; }
 
-    /* ── Mobile: stack into mini-cards ─────────────────────────── */
+    /* ── Mobile: two-line card (teams row + inputs row) ────────── */
     @media (max-width: 600px) {
         .block-container { padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
         [data-testid="stForm"] { padding: 0.4rem !important; }
 
-        /* Let columns wrap into two lines */
         [data-testid="stForm"] [data-testid="stHorizontalBlock"] {
             flex-wrap: wrap !important;
-            gap: 0rem 0.3rem !important;
+            gap: 2px 0 !important;
+            padding: 8px 0 !important;
+            justify-content: center !important;
         }
 
-        /* Line 1: team name cols span full width, side by side */
-        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1),
+        /* Row 1: Home team (left) + Away team (right) */
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1) {
+            order: 1 !important; flex: 1 1 48% !important; max-width: 48% !important;
+        }
         [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(5) {
-            flex: 1 1 45% !important; max-width: 48% !important;
+            order: 2 !important; flex: 1 1 48% !important; max-width: 48% !important;
+            text-align: right !important;
+        }
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(5) .team-name {
+            justify-content: flex-end;
         }
 
-        /* Line 2: input cols centered */
-        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2),
-        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) {
-            flex: 1 1 25% !important; max-width: 30% !important;
+        /* Row 2: [H input] x [A input] centered */
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2) {
+            order: 3 !important; flex: 0 0 25% !important; max-width: 25% !important;
         }
         [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) {
-            flex: 0 0 auto !important; max-width: 15% !important;
+            order: 4 !important; flex: 0 0 10% !important; max-width: 10% !important;
+            text-align: center !important;
+        }
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) {
+            order: 5 !important; flex: 0 0 25% !important; max-width: 25% !important;
         }
 
         .bet-date { display: none !important; }
         [data-testid="stForm"] .odds-row { display: none !important; }
-        .team-name { font-size: 0.78rem; }
-        .team-name img { width: 16px !important; height: 16px !important; }
+        .team-name { font-size: 0.8rem; }
+        .team-name img { width: 16px !important; height: 16px !important; margin-right: 4px !important; }
         [data-testid="stForm"] .stNumberInput > div > div > input {
-            font-size: 0.9rem !important; height: 1.7rem !important; padding: 2px 1px !important;
+            font-size: 1rem !important; height: 1.8rem !important;
         }
-        .compact-row-border { padding: 3px 0 !important; }
     }
 </style>
 """, unsafe_allow_html=True)
