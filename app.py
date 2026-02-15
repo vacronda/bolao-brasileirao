@@ -146,8 +146,13 @@ st.markdown("""
         overflow: hidden;
     }
     [data-testid="stForm"] .stNumberInput { margin-bottom: 0 !important; }
+    [data-testid="stForm"] .stNumberInput > div,
+    [data-testid="stForm"] .stNumberInput > div > div {
+        min-width: 0 !important;
+    }
     [data-testid="stForm"] .stNumberInput > div > div > input {
         padding: 2px 1px !important; font-size: 0.9rem !important; height: 1.8rem !important;
+        min-width: 0 !important; width: 100% !important;
         -moz-appearance: textfield !important;
     }
     [data-testid="stForm"] .stNumberInput > div > div > input::-webkit-outer-spin-button,
@@ -171,12 +176,17 @@ st.markdown("""
 
     /* ── Mobile: hide odds & date, shrink everything ──────────── */
     @media (max-width: 768px) {
+        .block-container { padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
+        [data-testid="stForm"] { padding: 0.3rem !important; }
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] {
+            gap: 0.15rem !important; max-width: 100% !important;
+        }
         [data-testid="stForm"] .odds-row { display: none !important; }
         [data-testid="stForm"] .bet-date { display: none !important; }
         [data-testid="stForm"] .stMarkdown img { width: 14px !important; height: 14px !important; }
-        [data-testid="stForm"] .stMarkdown p { font-size: 0.75rem !important; }
+        [data-testid="stForm"] .stMarkdown p { font-size: 0.72rem !important; }
         [data-testid="stForm"] .stNumberInput > div > div > input {
-            font-size: 0.85rem !important; height: 1.6rem !important; padding: 1px 0 !important;
+            font-size: 0.85rem !important; height: 1.5rem !important; padding: 1px 0 !important;
         }
         .compact-row-border { margin: 0 !important; padding: 0 !important; }
     }
