@@ -4,27 +4,28 @@ Uses Turso (libsql) for cloud-hosted SQLite that persists across redeployments.
 Falls back to local SQLite for development.
 """
 
+from __future__ import annotations
+
 import os
 import secrets
 from datetime import datetime, timedelta
 from contextlib import contextmanager
+from typing import Optional
 
-import streamlit as st
 
 # ─── Connection setup ──────────────────────────────────────────────────────────
-# Turso (production): reads TURSO_URL and TURSO_AUTH_TOKEN from st.secrets
-# Local (development): uses a local bolao.db file if secrets are not set
+# Turso (production): reads TURSO_URL and TURSO_AUTH_TOKEN from environment
+# Local (development): uses a local bolao.db file if env vars are not set
 
 _USE_TURSO = None  # cached flag
 
 
 def _get_turso_config() -> tuple[str, str] | None:
-    try:
-        url = st.secrets["TURSO_URL"]
-        token = st.secrets["TURSO_AUTH_TOKEN"]
+    url = os.environ.get("TURSO_URL")
+    token = os.environ.get("TURSO_AUTH_TOKEN")
+    if url and token:
         return (url, token)
-    except (FileNotFoundError, KeyError):
-        return None
+    return None
 
 
 class _DictCursor:
@@ -143,19 +144,6 @@ def init_db():
                 is_finished INTEGER DEFAULT 0,
                 created_at TEXT DEFAULT (datetime('now'))
             )""",
-            """CREATE TABLE IF NOT EXISTS bets (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                match_id INTEGER NOT NULL,
-                home_score INTEGER NOT NULL,
-                away_score INTEGER NOT NULL,
-                points_awarded INTEGER,
-                created_at TEXT DEFAULT (datetime('now')),
-                updated_at TEXT DEFAULT (datetime('now')),
-                FOREIGN KEY (user_id) REFERENCES users(id),
-                FOREIGN KEY (match_id) REFERENCES matches(id),
-                UNIQUE(user_id, match_id)
-            )""",
             """CREATE TABLE IF NOT EXISTS scoring_config (
                 id INTEGER PRIMARY KEY CHECK (id = 1),
                 exact_score INTEGER DEFAULT 10,
@@ -184,27 +172,62 @@ def init_db():
                 created_at TEXT DEFAULT (datetime('now')),
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )""",
+            # ─── League tables ──────────────────────────────────
+            """CREATE TABLE IF NOT EXISTS leagues (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                competition TEXT NOT NULL,
+                invite_code TEXT UNIQUE NOT NULL,
+                created_by INTEGER NOT NULL,
+                start_date TEXT,
+                end_date TEXT,
+                created_at TEXT DEFAULT (datetime('now')),
+                FOREIGN KEY (created_by) REFERENCES users(id)
+            )""",
+            """CREATE TABLE IF NOT EXISTS league_members (
+                league_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                role TEXT NOT NULL DEFAULT 'member',
+                joined_at TEXT DEFAULT (datetime('now')),
+                PRIMARY KEY (league_id, user_id),
+                FOREIGN KEY (league_id) REFERENCES leagues(id),
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )""",
+            """CREATE TABLE IF NOT EXISTS league_scoring (
+                league_id INTEGER PRIMARY KEY,
+                exact_score INTEGER DEFAULT 10,
+                correct_winner_goal_diff INTEGER DEFAULT 5,
+                correct_winner INTEGER DEFAULT 3,
+                correct_draw INTEGER DEFAULT 3,
+                wrong INTEGER DEFAULT 0,
+                FOREIGN KEY (league_id) REFERENCES leagues(id)
+            )""",
         ]
         for stmt in statements:
             conn.execute(stmt)
         conn.commit()
 
-        # Migration: add league column if missing
+        # Migration: add league column to matches if missing
         try:
             conn.execute("SELECT league FROM matches LIMIT 1")
         except Exception:
             conn.execute("ALTER TABLE matches ADD COLUMN league TEXT NOT NULL DEFAULT 'Brasileirão'")
 
-        # Migration: add avatar_url column if missing
+        # Migration: add avatar_url column to users if missing
         try:
             conn.execute("SELECT avatar_url FROM users LIMIT 1")
         except Exception:
             conn.execute("ALTER TABLE users ADD COLUMN avatar_url TEXT")
 
+        # Migration: add league_id column to bets if missing
+        _migrate_bets_add_league_id(conn)
+
+        # Seed scoring config
         row = _to_dict(conn.execute("SELECT COUNT(*) as cnt FROM scoring_config").fetchone())
         if row["cnt"] == 0:
             conn.execute("INSERT INTO scoring_config (id) VALUES (1)")
 
+        # Seed admin user
         row = _to_dict(conn.execute("SELECT COUNT(*) as cnt FROM users").fetchone())
         if row["cnt"] == 0:
             from auth import hash_password
@@ -224,6 +247,144 @@ def init_db():
                     "INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, 0)",
                     (bot_name, hash_password(f"bot-{bot_name}-no-login")),
                 )
+
+        # Migration: create default leagues for existing data
+        _migrate_create_default_leagues(conn)
+
+
+def _migrate_bets_add_league_id(conn):
+    """Migrate bets table to include league_id column."""
+    try:
+        conn.execute("SELECT league_id FROM bets LIMIT 1")
+        return  # already migrated
+    except Exception:
+        pass
+
+    # Check if bets table exists with data
+    try:
+        row = _to_dict(conn.execute("SELECT COUNT(*) as cnt FROM bets").fetchone())
+        has_data = row["cnt"] > 0
+    except Exception:
+        has_data = False
+
+    if has_data:
+        # Rename old table, create new, copy data
+        conn.execute("ALTER TABLE bets RENAME TO bets_old")
+        conn.execute("""CREATE TABLE bets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            match_id INTEGER NOT NULL,
+            league_id INTEGER,
+            home_score INTEGER NOT NULL,
+            away_score INTEGER NOT NULL,
+            points_awarded INTEGER,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (user_id) REFERENCES users(id),
+            FOREIGN KEY (match_id) REFERENCES matches(id),
+            FOREIGN KEY (league_id) REFERENCES leagues(id),
+            UNIQUE(user_id, match_id, league_id)
+        )""")
+        # Copy data - league_id will be populated by _migrate_create_default_leagues
+        conn.execute("""INSERT INTO bets (id, user_id, match_id, home_score, away_score,
+                        points_awarded, created_at, updated_at)
+                        SELECT id, user_id, match_id, home_score, away_score,
+                        points_awarded, created_at, updated_at FROM bets_old""")
+        conn.execute("DROP TABLE bets_old")
+    else:
+        # No data or table doesn't exist - create fresh
+        try:
+            conn.execute("DROP TABLE IF EXISTS bets")
+        except Exception:
+            pass
+        conn.execute("""CREATE TABLE IF NOT EXISTS bets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            match_id INTEGER NOT NULL,
+            league_id INTEGER,
+            home_score INTEGER NOT NULL,
+            away_score INTEGER NOT NULL,
+            points_awarded INTEGER,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (user_id) REFERENCES users(id),
+            FOREIGN KEY (match_id) REFERENCES matches(id),
+            FOREIGN KEY (league_id) REFERENCES leagues(id),
+            UNIQUE(user_id, match_id, league_id)
+        )""")
+    conn.commit()
+
+
+def _migrate_create_default_leagues(conn):
+    """Create default leagues and assign existing users/bets if leagues table is empty."""
+    row = _to_dict(conn.execute("SELECT COUNT(*) as cnt FROM leagues").fetchone())
+    if row["cnt"] > 0:
+        return  # already migrated
+
+    # Check if there are existing matches
+    match_count = _to_dict(
+        conn.execute("SELECT COUNT(*) as cnt FROM matches").fetchone()
+    )["cnt"]
+    if match_count == 0:
+        return  # fresh install, nothing to migrate
+
+    # Find admin user
+    admin = _to_dict(conn.execute(
+        "SELECT id FROM users WHERE is_admin = 1 LIMIT 1"
+    ).fetchone())
+    admin_id = admin["id"] if admin else 1
+
+    # Get global scoring config for seeding league scoring
+    global_config = _to_dict(
+        conn.execute("SELECT * FROM scoring_config WHERE id = 1").fetchone()
+    )
+
+    # Get all distinct competitions from matches
+    competitions = _to_dicts(
+        conn.execute("SELECT DISTINCT league FROM matches").fetchall()
+    )
+
+    league_map = {}  # competition name -> league_id
+    for comp in competitions:
+        comp_name = comp["league"]
+        invite_code = secrets.token_urlsafe(6)
+        cur = conn.execute(
+            """INSERT INTO leagues (name, competition, invite_code, created_by)
+               VALUES (?, ?, ?, ?)""",
+            (f"Bolão {comp_name}", comp_name, invite_code, admin_id),
+        )
+        lg_id = cur.lastrowid
+        league_map[comp_name] = lg_id
+
+        # Create league scoring with global config values
+        if global_config:
+            conn.execute(
+                """INSERT INTO league_scoring (league_id, exact_score, correct_winner_goal_diff,
+                   correct_winner, correct_draw, wrong) VALUES (?, ?, ?, ?, ?, ?)""",
+                (lg_id, global_config["exact_score"], global_config["correct_winner_goal_diff"],
+                 global_config["correct_winner"], global_config["correct_draw"], global_config["wrong"]),
+            )
+
+    # Add all users to all default leagues
+    all_users = _to_dicts(conn.execute("SELECT id FROM users").fetchall())
+    for lg_id in league_map.values():
+        for u in all_users:
+            role = "admin" if u["id"] == admin_id else "member"
+            conn.execute(
+                "INSERT OR IGNORE INTO league_members (league_id, user_id, role) VALUES (?, ?, ?)",
+                (lg_id, u["id"], role),
+            )
+
+    # Assign league_id to existing bets based on match competition
+    for comp_name, lg_id in league_map.items():
+        conn.execute(
+            """UPDATE bets SET league_id = ?
+               WHERE league_id IS NULL
+               AND match_id IN (SELECT id FROM matches WHERE league = ?)""",
+            (lg_id, comp_name),
+        )
+
+    conn.commit()
 
 
 # ─── User operations ──────────────────────────────────────────────────────────
@@ -265,6 +426,7 @@ def delete_user(user_id: int) -> bool:
         if not user or user["is_admin"]:
             return False
         conn.execute("DELETE FROM bets WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM league_members WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
         return True
 
@@ -316,7 +478,8 @@ def add_match(round_number: int, home_team: str, away_team: str, match_time: str
         return cur.lastrowid
 
 
-def get_leagues() -> list[str]:
+def get_competitions() -> list[str]:
+    """Return distinct competition names from matches."""
     with get_conn() as conn:
         rows = conn.execute("SELECT DISTINCT league FROM matches ORDER BY league").fetchall()
         return [_to_dict(r)["league"] for r in rows]
@@ -364,6 +527,7 @@ def get_unfinished_matches() -> list[dict]:
 
 
 def set_match_result(match_id: int, home_score: int, away_score: int):
+    """Set result and calculate points for all bets on this match across all leagues."""
     with get_conn() as conn:
         conn.execute(
             "UPDATE matches SET home_score = ?, away_score = ?, is_finished = 1 WHERE id = ?",
@@ -379,13 +543,28 @@ def delete_match(match_id: int):
 
 
 def _calculate_points_for_match(conn, match_id: int, real_home: int, real_away: int):
-    config = _to_dict(
-        conn.execute("SELECT * FROM scoring_config WHERE id = 1").fetchone()
-    )
+    """Calculate points for all bets on a match, using each bet's league scoring config."""
     bets = _to_dicts(
         conn.execute("SELECT * FROM bets WHERE match_id = ?", (match_id,)).fetchall()
     )
+    # Cache scoring configs per league
+    scoring_cache = {}
     for bet in bets:
+        league_id = bet.get("league_id")
+        if league_id and league_id not in scoring_cache:
+            config = _to_dict(
+                conn.execute("SELECT * FROM league_scoring WHERE league_id = ?", (league_id,)).fetchone()
+            )
+            if config:
+                scoring_cache[league_id] = config
+
+        # Use league scoring if available, else fall back to global
+        config = scoring_cache.get(league_id)
+        if not config:
+            config = _to_dict(
+                conn.execute("SELECT * FROM scoring_config WHERE id = 1").fetchone()
+            )
+
         points = _score_bet(
             bet["home_score"], bet["away_score"],
             real_home, real_away,
@@ -425,8 +604,8 @@ def _score_bet(
 
 # ─── Bet operations ────────────────────────────────────────────────────────────
 
-def upsert_bet(user_id: int, match_id: int, home_score: int, away_score: int) -> bool:
-    """Insert or update a bet. Returns False if match already started."""
+def upsert_bet(user_id: int, match_id: int, league_id: int, home_score: int, away_score: int) -> bool:
+    """Insert or update a bet for a specific league. Returns False if match already started."""
     with get_conn() as conn:
         match = _to_dict(
             conn.execute(
@@ -441,28 +620,438 @@ def upsert_bet(user_id: int, match_id: int, home_score: int, away_score: int) ->
             return False
 
         conn.execute(
-            """INSERT INTO bets (user_id, match_id, home_score, away_score, updated_at)
-               VALUES (?, ?, ?, ?, datetime('now'))
-               ON CONFLICT(user_id, match_id) DO UPDATE SET
+            """INSERT INTO bets (user_id, match_id, league_id, home_score, away_score, updated_at)
+               VALUES (?, ?, ?, ?, ?, datetime('now'))
+               ON CONFLICT(user_id, match_id, league_id) DO UPDATE SET
                    home_score = excluded.home_score,
                    away_score = excluded.away_score,
                    updated_at = datetime('now')
             """,
-            (user_id, match_id, home_score, away_score),
+            (user_id, match_id, league_id, home_score, away_score),
         )
         return True
 
 
-def get_user_bets(user_id: int) -> dict[int, dict]:
-    """Returns {match_id: {home_score, away_score, points_awarded}}"""
+def get_user_bets(user_id: int, league_id: int = None) -> dict[int, dict]:
+    """Returns {match_id: bet_dict}. If league_id given, scoped to that league."""
     with get_conn() as conn:
-        rows = _to_dicts(
-            conn.execute("SELECT * FROM bets WHERE user_id = ?", (user_id,)).fetchall()
-        )
+        if league_id:
+            rows = _to_dicts(
+                conn.execute(
+                    "SELECT * FROM bets WHERE user_id = ? AND league_id = ?",
+                    (user_id, league_id),
+                ).fetchall()
+            )
+        else:
+            rows = _to_dicts(
+                conn.execute("SELECT * FROM bets WHERE user_id = ?", (user_id,)).fetchall()
+            )
         return {r["match_id"]: r for r in rows}
 
 
-# ─── Leaderboard ──────────────────────────────────────────────────────────────
+def get_all_bets_for_match(match_id: int, league_id: int = None) -> list[dict]:
+    """Returns all bets for a match joined with username. Optionally scoped to league."""
+    with get_conn() as conn:
+        if league_id:
+            rows = conn.execute(
+                """SELECT b.id, b.user_id, u.username, b.home_score, b.away_score,
+                          b.points_awarded, b.league_id
+                   FROM bets b
+                   JOIN users u ON u.id = b.user_id
+                   WHERE b.match_id = ? AND b.league_id = ?
+                   ORDER BY u.username""",
+                (match_id, league_id),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """SELECT b.id, b.user_id, u.username, b.home_score, b.away_score,
+                          b.points_awarded, b.league_id
+                   FROM bets b
+                   JOIN users u ON u.id = b.user_id
+                   WHERE b.match_id = ?
+                   ORDER BY u.username""",
+                (match_id,),
+            ).fetchall()
+        return _to_dicts(rows)
+
+
+def admin_upsert_bet(user_id: int, match_id: int, home_score: int, away_score: int, league_id: int = None):
+    """Insert or update a bet without time/finished checks (admin override)."""
+    with get_conn() as conn:
+        conn.execute(
+            """INSERT INTO bets (user_id, match_id, league_id, home_score, away_score, updated_at)
+               VALUES (?, ?, ?, ?, ?, datetime('now'))
+               ON CONFLICT(user_id, match_id, league_id) DO UPDATE SET
+                   home_score = excluded.home_score,
+                   away_score = excluded.away_score,
+                   updated_at = datetime('now')
+            """,
+            (user_id, match_id, league_id, home_score, away_score),
+        )
+
+
+def admin_delete_bet(bet_id: int):
+    """Delete a specific bet by ID."""
+    with get_conn() as conn:
+        conn.execute("DELETE FROM bets WHERE id = ?", (bet_id,))
+
+
+# ─── League operations ────────────────────────────────────────────────────────
+
+def create_league(name: str, competition: str, created_by: int,
+                  start_date: str | None = None, end_date: str | None = None) -> dict:
+    """Create a new league, add creator as admin, add bots, create scoring config."""
+    invite_code = secrets.token_urlsafe(6)
+    with get_conn() as conn:
+        cur = conn.execute(
+            """INSERT INTO leagues (name, competition, invite_code, created_by, start_date, end_date)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (name, competition, invite_code, created_by, start_date, end_date),
+        )
+        league_id = cur.lastrowid
+
+        # Create league scoring with defaults
+        conn.execute(
+            "INSERT INTO league_scoring (league_id) VALUES (?)",
+            (league_id,),
+        )
+
+        # Add creator as admin
+        conn.execute(
+            "INSERT INTO league_members (league_id, user_id, role) VALUES (?, ?, 'admin')",
+            (league_id, created_by),
+        )
+
+        # Auto-add bot users
+        for bot_name in ("Olavo", "PVC"):
+            bot = _to_dict(
+                conn.execute("SELECT id FROM users WHERE username = ?", (bot_name,)).fetchone()
+            )
+            if bot and bot["id"] != created_by:
+                conn.execute(
+                    "INSERT OR IGNORE INTO league_members (league_id, user_id, role) VALUES (?, ?, 'member')",
+                    (league_id, bot["id"]),
+                )
+
+        return {
+            "id": league_id, "name": name, "competition": competition,
+            "invite_code": invite_code, "created_by": created_by,
+            "start_date": start_date, "end_date": end_date,
+        }
+
+
+def get_league_by_invite_code(invite_code: str) -> dict | None:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM leagues WHERE invite_code = ?", (invite_code,)
+        ).fetchone()
+        return _to_dict(row) if row else None
+
+
+def get_league_by_id(league_id: int) -> dict | None:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM leagues WHERE id = ?", (league_id,)
+        ).fetchone()
+        return _to_dict(row) if row else None
+
+
+def update_league(league_id: int, name: str, start_date: str | None, end_date: str | None):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE leagues SET name = ?, start_date = ?, end_date = ? WHERE id = ?",
+            (name, start_date, end_date, league_id),
+        )
+
+
+def delete_league(league_id: int):
+    """Delete a league and all associated data."""
+    with get_conn() as conn:
+        conn.execute("DELETE FROM bets WHERE league_id = ?", (league_id,))
+        conn.execute("DELETE FROM league_scoring WHERE league_id = ?", (league_id,))
+        conn.execute("DELETE FROM league_members WHERE league_id = ?", (league_id,))
+        conn.execute("DELETE FROM leagues WHERE id = ?", (league_id,))
+
+
+# ─── League membership ────────────────────────────────────────────────────────
+
+def join_league(league_id: int, user_id: int) -> bool:
+    """Add user to league. Returns False if already a member."""
+    with get_conn() as conn:
+        try:
+            conn.execute(
+                "INSERT INTO league_members (league_id, user_id, role) VALUES (?, ?, 'member')",
+                (league_id, user_id),
+            )
+            return True
+        except Exception:
+            return False
+
+
+def leave_league(league_id: int, user_id: int) -> bool:
+    """Remove user from league. Prevents league admin from leaving."""
+    with get_conn() as conn:
+        row = _to_dict(conn.execute(
+            "SELECT role FROM league_members WHERE league_id = ? AND user_id = ?",
+            (league_id, user_id),
+        ).fetchone())
+        if not row or row["role"] == "admin":
+            return False
+        conn.execute(
+            "DELETE FROM league_members WHERE league_id = ? AND user_id = ?",
+            (league_id, user_id),
+        )
+        # Also remove their bets in this league
+        conn.execute(
+            "DELETE FROM bets WHERE league_id = ? AND user_id = ?",
+            (league_id, user_id),
+        )
+        return True
+
+
+def remove_league_member(league_id: int, user_id: int) -> bool:
+    """League admin removes a member. Cannot remove the admin."""
+    return leave_league(league_id, user_id)
+
+
+def get_user_leagues(user_id: int) -> list[dict]:
+    """Get all leagues a user belongs to, with member count and role."""
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT l.*, lm.role,
+                   (SELECT COUNT(*) FROM league_members WHERE league_id = l.id) as member_count
+            FROM leagues l
+            JOIN league_members lm ON lm.league_id = l.id
+            WHERE lm.user_id = ?
+            ORDER BY l.name
+        """, (user_id,)).fetchall()
+        return _to_dicts(rows)
+
+
+def get_league_members(league_id: int) -> list[dict]:
+    """Get all members of a league with their user info."""
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT u.id as user_id, u.username, u.avatar_url, lm.role, lm.joined_at
+            FROM league_members lm
+            JOIN users u ON u.id = lm.user_id
+            WHERE lm.league_id = ?
+            ORDER BY lm.role DESC, u.username
+        """, (league_id,)).fetchall()
+        return _to_dicts(rows)
+
+
+def is_league_member(league_id: int, user_id: int) -> bool:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM league_members WHERE league_id = ? AND user_id = ?",
+            (league_id, user_id),
+        ).fetchone()
+        return row is not None
+
+
+def get_league_member_role(league_id: int, user_id: int) -> str | None:
+    """Returns 'admin', 'member', or None if not a member."""
+    with get_conn() as conn:
+        row = _to_dict(conn.execute(
+            "SELECT role FROM league_members WHERE league_id = ? AND user_id = ?",
+            (league_id, user_id),
+        ).fetchone())
+        return row["role"] if row else None
+
+
+# ─── League scoring ───────────────────────────────────────────────────────────
+
+def get_league_scoring(league_id: int) -> dict | None:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM league_scoring WHERE league_id = ?", (league_id,)
+        ).fetchone()
+        return _to_dict(row) if row else None
+
+
+def update_league_scoring(league_id: int, exact_score: int, correct_winner_goal_diff: int,
+                          correct_winner: int, correct_draw: int, wrong: int):
+    """Update scoring config for a league and recalculate all points."""
+    with get_conn() as conn:
+        conn.execute(
+            """UPDATE league_scoring SET
+                exact_score = ?, correct_winner_goal_diff = ?,
+                correct_winner = ?, correct_draw = ?, wrong = ?
+               WHERE league_id = ?""",
+            (exact_score, correct_winner_goal_diff, correct_winner, correct_draw, wrong, league_id),
+        )
+    # Recalculate all points for this league
+    recalculate_league_points(league_id)
+
+
+def recalculate_league_points(league_id: int):
+    """Recalculate points for all bets in a league using its scoring config."""
+    with get_conn() as conn:
+        config = _to_dict(
+            conn.execute("SELECT * FROM league_scoring WHERE league_id = ?", (league_id,)).fetchone()
+        )
+        if not config:
+            return
+
+        bets = _to_dicts(conn.execute("""
+            SELECT b.*, m.home_score as real_home, m.away_score as real_away
+            FROM bets b
+            JOIN matches m ON m.id = b.match_id
+            WHERE b.league_id = ? AND m.is_finished = 1
+        """, (league_id,)).fetchall())
+
+        for bet in bets:
+            points = _score_bet(
+                bet["home_score"], bet["away_score"],
+                bet["real_home"], bet["real_away"],
+                config,
+            )
+            conn.execute(
+                "UPDATE bets SET points_awarded = ? WHERE id = ?",
+                (points, bet["id"]),
+            )
+
+
+# ─── League-scoped queries ───────────────────────────────────────────────────
+
+def _get_league_match_filter(league: dict) -> tuple[str, list]:
+    """Build SQL WHERE conditions for matches in a league's scope.
+    Returns (where_clause, params) to append to a query."""
+    conditions = ["m.league = ?"]
+    params = [league["competition"]]
+    if league.get("start_date"):
+        conditions.append("m.match_time >= ?")
+        params.append(league["start_date"])
+    if league.get("end_date"):
+        conditions.append("m.match_time <= ?")
+        params.append(league["end_date"])
+    return " AND ".join(conditions), params
+
+
+def get_league_upcoming_matches(league_id: int) -> list[dict]:
+    """Get upcoming unfinished matches for a league's competition within date range."""
+    with get_conn() as conn:
+        league = _to_dict(conn.execute(
+            "SELECT * FROM leagues WHERE id = ?", (league_id,)
+        ).fetchone())
+        if not league:
+            return []
+
+        sql = "SELECT * FROM matches m WHERE m.is_finished = 0"
+        where, params = _get_league_match_filter(league)
+        sql += " AND " + where
+        sql += " ORDER BY m.match_time ASC"
+        return _to_dicts(conn.execute(sql, tuple(params)).fetchall())
+
+
+def get_league_finished_matches(league_id: int) -> list[dict]:
+    """Get finished matches for a league's competition within date range."""
+    with get_conn() as conn:
+        league = _to_dict(conn.execute(
+            "SELECT * FROM leagues WHERE id = ?", (league_id,)
+        ).fetchone())
+        if not league:
+            return []
+
+        sql = "SELECT * FROM matches m WHERE m.is_finished = 1"
+        where, params = _get_league_match_filter(league)
+        sql += " AND " + where
+        sql += " ORDER BY m.match_time DESC"
+        return _to_dicts(conn.execute(sql, tuple(params)).fetchall())
+
+
+def get_league_leaderboard(league_id: int) -> list[dict]:
+    """Leaderboard scoped to a league's members, competition, and date range."""
+    with get_conn() as conn:
+        league = _to_dict(conn.execute(
+            "SELECT * FROM leagues WHERE id = ?", (league_id,)
+        ).fetchone())
+        if not league:
+            return []
+
+        # Get match IDs in scope
+        match_sql = "SELECT id FROM matches m WHERE m.is_finished = 1"
+        where, params = _get_league_match_filter(league)
+        match_sql += " AND " + where
+        match_rows = _to_dicts(conn.execute(match_sql, tuple(params)).fetchall())
+        finished_match_ids = [r["id"] for r in match_rows]
+        total_finished = len(finished_match_ids)
+
+        if not finished_match_ids:
+            # Return members with 0 points
+            members = conn.execute("""
+                SELECT u.id as user_id, u.username,
+                       0 as total_points, 0 as exact_count, 0 as zero_count,
+                       0 as total_bets, 0 as missed_count
+                FROM users u
+                JOIN league_members lm ON lm.user_id = u.id AND lm.league_id = ?
+                ORDER BY u.username
+            """, (league_id,)).fetchall()
+            return _to_dicts(members)
+
+        placeholders = ",".join("?" for _ in finished_match_ids)
+
+        # Get league scoring for exact_score comparison
+        scoring = _to_dict(
+            conn.execute("SELECT exact_score FROM league_scoring WHERE league_id = ?", (league_id,)).fetchone()
+        )
+        exact_pts = scoring["exact_score"] if scoring else 10
+
+        rows = conn.execute(f"""
+            SELECT
+                u.id as user_id,
+                u.username,
+                COALESCE(SUM(b.points_awarded), 0) as total_points,
+                COALESCE(SUM(CASE WHEN b.points_awarded = ? THEN 1 ELSE 0 END), 0) as exact_count,
+                COALESCE(SUM(CASE WHEN b.points_awarded = 0 THEN 1 ELSE 0 END), 0) as zero_count,
+                COUNT(b.id) as total_bets,
+                ? - COUNT(b.id) as missed_count
+            FROM users u
+            JOIN league_members lm ON lm.user_id = u.id AND lm.league_id = ?
+            LEFT JOIN bets b ON b.user_id = u.id
+                AND b.league_id = ?
+                AND b.match_id IN ({placeholders})
+                AND b.points_awarded IS NOT NULL
+            GROUP BY u.id
+            ORDER BY total_points DESC, exact_count DESC, u.username ASC
+        """, (exact_pts, total_finished, league_id, league_id, *finished_match_ids)).fetchall()
+        return _to_dicts(rows)
+
+
+def get_league_leaderboard_evolution(league_id: int) -> list[dict]:
+    """Returns rows of (username, match_time, points_awarded) for the league."""
+    with get_conn() as conn:
+        league = _to_dict(conn.execute(
+            "SELECT * FROM leagues WHERE id = ?", (league_id,)
+        ).fetchone())
+        if not league:
+            return []
+
+        sql = """
+            SELECT u.username, m.match_time, COALESCE(b.points_awarded, 0) as points_awarded
+            FROM bets b
+            JOIN users u ON u.id = b.user_id
+            JOIN matches m ON m.id = b.match_id
+            JOIN league_members lm ON lm.user_id = u.id AND lm.league_id = ?
+            WHERE b.league_id = ? AND m.is_finished = 1
+        """
+        params = [league_id, league_id]
+
+        # Apply date range filter
+        if league.get("start_date"):
+            sql += " AND m.match_time >= ?"
+            params.append(league["start_date"])
+        if league.get("end_date"):
+            sql += " AND m.match_time <= ?"
+            params.append(league["end_date"])
+
+        sql += " ORDER BY m.match_time ASC"
+        rows = conn.execute(sql, tuple(params)).fetchall()
+        return _to_dicts(rows)
+
+
+# ─── Global leaderboard (kept for backward compat) ───────────────────────────
 
 def get_leaderboard() -> list[dict]:
     with get_conn() as conn:
@@ -495,7 +1084,7 @@ def get_user_avatars() -> dict[int, str]:
         return {r["id"]: r["avatar_url"] for r in (_to_dicts(rows))}
 
 
-# ─── Scoring config ───────────────────────────────────────────────────────────
+# ─── Scoring config (global, kept for backward compat) ───────────────────────
 
 def get_scoring_config() -> dict:
     with get_conn() as conn:
@@ -523,6 +1112,49 @@ def update_scoring_config(
         )
 
 
+def recalculate_all_points():
+    """Recalculate points for all finished matches (used after global scoring config changes)."""
+    with get_conn() as conn:
+        config = _to_dict(
+            conn.execute("SELECT * FROM scoring_config WHERE id = 1").fetchone()
+        )
+        finished = _to_dicts(
+            conn.execute("SELECT * FROM matches WHERE is_finished = 1").fetchall()
+        )
+        for match in finished:
+            bets = _to_dicts(
+                conn.execute("SELECT * FROM bets WHERE match_id = ?", (match["id"],)).fetchall()
+            )
+            for bet in bets:
+                # Use league scoring if available, else global
+                league_id = bet.get("league_id")
+                if league_id:
+                    lconfig = _to_dict(
+                        conn.execute("SELECT * FROM league_scoring WHERE league_id = ?", (league_id,)).fetchone()
+                    )
+                    if lconfig:
+                        points = _score_bet(
+                            bet["home_score"], bet["away_score"],
+                            match["home_score"], match["away_score"],
+                            lconfig,
+                        )
+                        conn.execute(
+                            "UPDATE bets SET points_awarded = ? WHERE id = ?",
+                            (points, bet["id"]),
+                        )
+                        continue
+
+                points = _score_bet(
+                    bet["home_score"], bet["away_score"],
+                    match["home_score"], match["away_score"],
+                    config,
+                )
+                conn.execute(
+                    "UPDATE bets SET points_awarded = ? WHERE id = ?",
+                    (points, bet["id"]),
+                )
+
+
 # ─── Odds operations ─────────────────────────────────────────────────────────
 
 def upsert_odds(match_id: int, home_win: float, draw: float, away_win: float, bookmaker: str):
@@ -542,7 +1174,7 @@ def upsert_odds(match_id: int, home_win: float, draw: float, away_win: float, bo
 
 
 def get_odds_for_matches(match_ids: list[int]) -> dict[int, dict]:
-    """Returns {match_id: {home_win, draw, away_win, bookmaker}} for given match IDs."""
+    """Returns {match_id: odds_dict} for given match IDs."""
     if not match_ids:
         return {}
     with get_conn() as conn:
@@ -554,41 +1186,6 @@ def get_odds_for_matches(match_ids: list[int]) -> dict[int, dict]:
             ).fetchall()
         )
         return {r["match_id"]: r for r in rows}
-
-
-def get_all_bets_for_match(match_id: int) -> list[dict]:
-    """Returns all bets for a match joined with username, ordered by username."""
-    with get_conn() as conn:
-        rows = conn.execute(
-            """SELECT b.id, b.user_id, u.username, b.home_score, b.away_score, b.points_awarded
-               FROM bets b
-               JOIN users u ON u.id = b.user_id
-               WHERE b.match_id = ?
-               ORDER BY u.username""",
-            (match_id,),
-        ).fetchall()
-        return _to_dicts(rows)
-
-
-def admin_upsert_bet(user_id: int, match_id: int, home_score: int, away_score: int):
-    """Insert or update a bet without time/finished checks (admin override)."""
-    with get_conn() as conn:
-        conn.execute(
-            """INSERT INTO bets (user_id, match_id, home_score, away_score, updated_at)
-               VALUES (?, ?, ?, ?, datetime('now'))
-               ON CONFLICT(user_id, match_id) DO UPDATE SET
-                   home_score = excluded.home_score,
-                   away_score = excluded.away_score,
-                   updated_at = datetime('now')
-            """,
-            (user_id, match_id, home_score, away_score),
-        )
-
-
-def admin_delete_bet(bet_id: int):
-    """Delete a specific bet by ID."""
-    with get_conn() as conn:
-        conn.execute("DELETE FROM bets WHERE id = ?", (bet_id,))
 
 
 # ─── Team operations ──────────────────────────────────────────────────────────
@@ -669,28 +1266,3 @@ def get_leaderboard_evolution() -> list[dict]:
             ORDER BY m.match_time ASC
         """).fetchall()
         return _to_dicts(rows)
-
-
-def recalculate_all_points():
-    """Recalculate points for all finished matches (used after scoring config changes)."""
-    with get_conn() as conn:
-        config = _to_dict(
-            conn.execute("SELECT * FROM scoring_config WHERE id = 1").fetchone()
-        )
-        finished = _to_dicts(
-            conn.execute("SELECT * FROM matches WHERE is_finished = 1").fetchall()
-        )
-        for match in finished:
-            bets = _to_dicts(
-                conn.execute("SELECT * FROM bets WHERE match_id = ?", (match["id"],)).fetchall()
-            )
-            for bet in bets:
-                points = _score_bet(
-                    bet["home_score"], bet["away_score"],
-                    match["home_score"], match["away_score"],
-                    config,
-                )
-                conn.execute(
-                    "UPDATE bets SET points_awarded = ? WHERE id = ?",
-                    (points, bet["id"]),
-                )

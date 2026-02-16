@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}{{ league.name }} - Bolão{% endblock %}
+
+{% block content %}
+<!-- League header -->
+<div class="d-flex justify-between align-center mt-2 mb-1">
+    <div>
+        <h2 style="font-size:1.3rem;font-weight:700">{{ league.name }}</h2>
+        <span class="league-badge {% if 'Brasileir' in league.competition %}brasileirao{% else %}premier{% endif %}">
+            {{ league.competition }}
+        </span>
+    </div>
+    {% if league_role == 'admin' %}
+    <a href="{{ url_for('league_settings', league_id=league.id) }}" class="btn btn-secondary btn-sm">Configurações</a>
+    {% endif %}
+</div>
+
+<!-- Mini leaderboard -->
+<div class="section-header"><span>Classificação</span></div>
+{% if leaderboard %}
+<table class="lb-table">
+    <thead>
+        <tr>
+            <th>#</th>
+            <th>Jogador</th>
+            <th>Pts</th>
+            <th class="lb-stat-cell">Exatos</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in leaderboard[:5] %}
+        <tr class="{% if row.user_id == g.user.id %}lb-me{% endif %} {% if loop.index == 1 %}lb-top1{% elif loop.index == 2 %}lb-top2{% elif loop.index == 3 %}lb-top3{% endif %}">
+            <td class="lb-rank-cell">{{ loop.index }}</td>
+            <td>
+                <div class="lb-name-cell">
+                    {% set avatar = avatars.get(row.user_id) %}
+                    {% if avatar %}
+                    <img src="{{ avatar }}" class="lb-avatar" alt="">
+                    {% else %}
+                    <img src="https://ui-avatars.com/api/?name={{ row.username[:2] }}&size=26&background=random&bold=true&format=svg" class="lb-avatar" alt="">
+                    {% endif %}
+                    {{ row.username }}
+                </div>
+            </td>
+            <td class="lb-pts-cell">{{ row.total_points }}</td>
+            <td class="lb-stat-cell">{{ row.exact_count }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% if leaderboard|length > 5 %}
+<p class="text-center mt-1">
+    <a href="{{ url_for('league_leaderboard', league_id=league.id) }}" class="text-sm">Ver classificação completa</a>
+</p>
+{% endif %}
+{% else %}
+<p class="text-muted text-sm">Nenhum jogo finalizado ainda.</p>
+{% endif %}
+
+<!-- Upcoming matches with betting -->
+<div class="section-header"><span>Próximos Jogos</span></div>
+{% if upcoming_matches %}
+<form method="POST" action="{{ url_for('league_bets_submit', league_id=league.id) }}">
+    {% for match in upcoming_matches %}
+    {% set locked = match._locked %}
+    <div class="bet-row" {% if locked %}style="opacity:0.5"{% endif %}>
+        <div style="flex:1;min-width:0">
+            <span class="bet-date">{{ match._display_time }} &middot; Rodada {{ match.round_number or '?' }}</span>
+            <div class="d-flex align-center gap-1">
+                <span class="team-name" style="flex:1">
+                    {% if logos.get(match.home_team) %}<img src="{{ logos[match.home_team] }}" alt="">{% endif %}
+                    {{ match.home_team }}
+                </span>
+                {% if locked %}
+                    {% set bet = user_bets.get(match.id) %}
+                    <span class="score-display">{{ bet.home_score if bet else '-' }}</span>
+                    <span class="score-x">x</span>
+                    <span class="score-display">{{ bet.away_score if bet else '-' }}</span>
+                {% else %}
+                    {% set bet = user_bets.get(match.id) %}
+                    <input type="number" name="home_{{ match.id }}" class="score-input"
+                           value="{{ bet.home_score if bet else '' }}" min="0" max="99">
+                    <span class="score-x">x</span>
+                    <input type="number" name="away_{{ match.id }}" class="score-input"
+                           value="{{ bet.away_score if bet else '' }}" min="0" max="99">
+                {% endif %}
+                <span class="team-name" style="flex:1;justify-content:flex-end">
+                    {{ match.away_team }}
+                    {% if logos.get(match.away_team) %}<img src="{{ logos[match.away_team] }}" alt="" style="margin-left:6px;margin-right:0">{% endif %}
+                </span>
+            </div>
+            {% if odds.get(match.id) %}
+            <div class="odds-row">
+                <span class="odds-badge home">{{ "%.2f"|format(odds[match.id].home_win) }}</span>
+                <span class="odds-badge draw">{{ "%.2f"|format(odds[match.id].draw) }}</span>
+                <span class="odds-badge away">{{ "%.2f"|format(odds[match.id].away_win) }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+    <button type="submit" class="btn btn-primary btn-block mt-2">Salvar Palpites</button>
+</form>
+{% else %}
+<p class="text-muted text-sm">Nenhum jogo programado.</p>
+{% endif %}
+{% endblock %}

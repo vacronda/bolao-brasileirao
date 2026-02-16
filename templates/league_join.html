@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Bolão - Entrar em Liga{% endblock %}
+
+{% block content %}
+<div class="card mt-3" style="max-width:500px;margin-left:auto;margin-right:auto">
+    {% if league %}
+        <!-- Confirming join via invite link -->
+        <h2 class="mb-1">Entrar na Liga</h2>
+        <div class="league-card {% if league.competition == 'Premier League' %}premier{% endif %}" style="margin:1rem 0">
+            <div class="league-card-info">
+                <h3>{{ league.name }}</h3>
+                <p>
+                    <span class="league-badge {% if 'Brasileir' in league.competition %}brasileirao{% else %}premier{% endif %}" style="font-size:0.65rem;padding:2px 6px">
+                        {{ league.competition }}
+                    </span>
+                </p>
+            </div>
+        </div>
+        {% if already_member %}
+            <p class="text-center text-muted">Você já é membro desta liga!</p>
+            <a href="{{ url_for('league_dashboard', league_id=league.id) }}" class="btn btn-primary btn-block">Ir para Liga</a>
+        {% else %}
+            <form method="POST" action="{{ url_for('league_join_by_code') }}">
+                <input type="hidden" name="invite_code" value="{{ league.invite_code }}">
+                <button type="submit" class="btn btn-primary btn-block">Entrar na Liga</button>
+            </form>
+        {% endif %}
+    {% else %}
+        <!-- Manual code entry -->
+        <h2 class="mb-2">Entrar em Liga</h2>
+        <form method="POST" action="{{ url_for('league_join_by_code') }}">
+            <div class="form-group">
+                <label for="invite_code">Código de Convite</label>
+                <input type="text" id="invite_code" name="invite_code" class="form-control" required placeholder="Cole o código aqui">
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Entrar</button>
+        </form>
+    {% endif %}
+</div>
+{% endblock %}

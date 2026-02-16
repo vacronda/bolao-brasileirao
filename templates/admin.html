@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Bolão - Admin{% endblock %}
+
+{% block content %}
+<h2 class="mt-2" style="font-size:1.3rem;font-weight:700">Administração</h2>
+
+<!-- Tabs -->
+<div class="tabs mt-2">
+    <a href="{{ url_for('admin_dashboard', tab='matches') }}" class="tab {% if tab == 'matches' %}active{% endif %}">Jogos</a>
+    <a href="{{ url_for('admin_dashboard', tab='add') }}" class="tab {% if tab == 'add' %}active{% endif %}">Adicionar</a>
+    <a href="{{ url_for('admin_dashboard', tab='results') }}" class="tab {% if tab == 'results' %}active{% endif %}">Resultados</a>
+    <a href="{{ url_for('admin_dashboard', tab='users') }}" class="tab {% if tab == 'users' %}active{% endif %}">Jogadores</a>
+</div>
+
+{% if tab == 'add' %}
+<!-- Add match -->
+<div class="card">
+    <h3 class="mb-1" style="font-size:1rem">Adicionar Jogo</h3>
+    <form method="POST" action="{{ url_for('admin_add_match') }}">
+        <div class="form-group">
+            <label for="league">Competição</label>
+            <select id="league" name="league" class="form-control">
+                <option value="Brasileirão">Brasileirão</option>
+                <option value="Premier League">Premier League</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="round_number">Rodada</label>
+            <input type="number" id="round_number" name="round_number" class="form-control" min="1">
+        </div>
+        <div class="form-group">
+            <label for="home_team">Time da Casa</label>
+            <input type="text" id="home_team" name="home_team" class="form-control" required>
+        </div>
+        <div class="form-group">
+            <label for="away_team">Time Visitante</label>
+            <input type="text" id="away_team" name="away_team" class="form-control" required>
+        </div>
+        <div class="form-group">
+            <label for="match_date">Data</label>
+            <input type="date" id="match_date" name="match_date" class="form-control" required>
+        </div>
+        <div class="form-group">
+            <label for="match_time">Horário</label>
+            <input type="time" id="match_time" name="match_time" class="form-control" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Adicionar Jogo</button>
+    </form>
+</div>
+
+{% elif tab == 'results' %}
+<!-- Enter results -->
+<div class="card">
+    <h3 class="mb-1" style="font-size:1rem">Inserir Resultados</h3>
+    {% if unfinished_matches %}
+    {% for match in unfinished_matches %}
+    <form method="POST" action="{{ url_for('admin_set_result') }}" class="bet-row">
+        <input type="hidden" name="match_id" value="{{ match.id }}">
+        <div style="flex:1;min-width:0">
+            <span class="bet-date">{{ match.match_time[:16] }} &middot; {{ match.league }}</span>
+            <div class="d-flex align-center gap-1">
+                <span class="team-name" style="flex:1">{{ match.home_team }}</span>
+                <input type="number" name="home_score" class="score-input" min="0" max="99" required>
+                <span class="score-x">x</span>
+                <input type="number" name="away_score" class="score-input" min="0" max="99" required>
+                <span class="team-name" style="flex:1;justify-content:flex-end">{{ match.away_team }}</span>
+                <button type="submit" class="btn btn-primary btn-sm">Salvar</button>
+            </div>
+        </div>
+    </form>
+    {% endfor %}
+    {% else %}
+    <p class="text-muted text-sm">Nenhum jogo pendente.</p>
+    {% endif %}
+</div>
+
+{% elif tab == 'users' %}
+<!-- Manage users -->
+<div class="card">
+    <h3 class="mb-1" style="font-size:1rem">Jogadores</h3>
+    {% for user in all_users %}
+    {% if not user.is_admin %}
+    <div class="member-item">
+        {% if user.avatar_url %}
+        <img src="{{ user.avatar_url }}" class="member-avatar" alt="">
+        {% else %}
+        <img src="https://ui-avatars.com/api/?name={{ user.username[:2] }}&size=32&background=random&bold=true&format=svg" class="member-avatar" alt="">
+        {% endif %}
+        <span class="member-name">{{ user.username }}</span>
+        <form method="POST" action="{{ url_for('admin_delete_user') }}" style="margin-left:auto"
+              onsubmit="return confirmAction('Deletar {{ user.username }}?')">
+            <input type="hidden" name="user_id" value="{{ user.id }}">
+            <button type="submit" class="btn btn-danger btn-sm">Deletar</button>
+        </form>
+    </div>
+    {% endif %}
+    {% endfor %}
+</div>
+
+{% else %}
+<!-- Match list -->
+<div class="card">
+    <h3 class="mb-1" style="font-size:1rem">Todos os Jogos</h3>
+    {% for match in all_matches %}
+    <div class="bet-row">
+        <div style="flex:1;min-width:0">
+            <span class="bet-date">{{ match.match_time[:16] }} &middot; {{ match.league }} &middot; R{{ match.round_number or '?' }}</span>
+            <div class="mc-teams">
+                {{ match.home_team }}
+                {% if match.is_finished %}
+                    {{ match.home_score }} x {{ match.away_score }}
+                {% else %}
+                    vs
+                {% endif %}
+                {{ match.away_team }}
+            </div>
+        </div>
+        <form method="POST" action="{{ url_for('admin_delete_match', match_id=match.id) }}"
+              onsubmit="return confirmAction('Deletar este jogo?')">
+            <button type="submit" class="btn btn-danger btn-sm">X</button>
+        </form>
+    </div>
+    {% endfor %}
+    {% if not all_matches %}
+    <p class="text-muted text-sm">Nenhum jogo cadastrado.</p>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

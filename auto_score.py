@@ -342,6 +342,19 @@ def place_bot_bets(conn, unfinished):
             row_dict = dict(zip(cols, r))
             odds_map[row_dict["match_id"]] = row_dict
 
+    # Get all leagues each bot belongs to
+    bot_leagues = {}
+    for bot_name, user_id in bots.items():
+        cur = conn.execute(
+            """SELECT l.id, l.competition, l.start_date, l.end_date
+               FROM leagues l
+               JOIN league_members lm ON lm.league_id = l.id
+               WHERE lm.user_id = ?""",
+            (user_id,),
+        )
+        cols = [d[0] for d in cur.description]
+        bot_leagues[bot_name] = [dict(zip(cols, r)) for r in cur.fetchall()]
+
     bets_placed = 0
     for m in unfinished:
         # Skip matches that have already started
@@ -352,22 +365,35 @@ def place_bot_bets(conn, unfinished):
         odds = odds_map.get(match_id)
 
         for bot_name, user_id in bots.items():
-            if bot_name == "Olavo":
-                h, a = olavo_pick(match_id)
-            else:
-                h, a = pvc_pick(odds)
+            # Place a bet for each league the bot belongs to that covers this match
+            for league in bot_leagues.get(bot_name, []):
+                # Check if match's competition matches the league's competition
+                if league["competition"] != m["league"]:
+                    continue
+                # Check date range
+                if league.get("start_date") and m["match_time"] < league["start_date"]:
+                    continue
+                if league.get("end_date") and m["match_time"] > league["end_date"]:
+                    continue
 
-            conn.execute(
-                """INSERT INTO bets (user_id, match_id, home_score, away_score, updated_at)
-                   VALUES (?, ?, ?, ?, datetime('now'))
-                   ON CONFLICT(user_id, match_id) DO UPDATE SET
-                       home_score = excluded.home_score,
-                       away_score = excluded.away_score,
-                       updated_at = datetime('now')
-                """,
-                (user_id, match_id, h, a),
-            )
-            bets_placed += 1
+                league_id = league["id"]
+
+                if bot_name == "Olavo":
+                    h, a = olavo_pick(match_id)
+                else:
+                    h, a = pvc_pick(odds)
+
+                conn.execute(
+                    """INSERT INTO bets (user_id, match_id, league_id, home_score, away_score, updated_at)
+                       VALUES (?, ?, ?, ?, ?, datetime('now'))
+                       ON CONFLICT(user_id, match_id, league_id) DO UPDATE SET
+                           home_score = excluded.home_score,
+                           away_score = excluded.away_score,
+                           updated_at = datetime('now')
+                    """,
+                    (user_id, match_id, league_id, h, a),
+                )
+                bets_placed += 1
 
     print(f"[BOTS] Placed {bets_placed} bot bet(s).")
 
@@ -481,16 +507,30 @@ def main():
                 (home_score, away_score, db_match["id"]),
             )
 
-            # Calculate points for all bets on this match
+            # Calculate points for all bets on this match, using per-league scoring
             bet_cur = conn.execute("SELECT * FROM bets WHERE match_id = ?", (db_match["id"],))
             bet_cols = [d[0] for d in bet_cur.description]
             bets = [dict(zip(bet_cols, r)) for r in bet_cur.fetchall()]
 
+            # Cache league scoring configs
+            league_scoring_cache = {}
+
             for bet in bets:
+                league_id = bet.get("league_id")
+                if league_id and league_id not in league_scoring_cache:
+                    sc_cur = conn.execute(
+                        "SELECT * FROM league_scoring WHERE league_id = ?", (league_id,)
+                    )
+                    sc_cols = [d[0] for d in sc_cur.description]
+                    sc_row = sc_cur.fetchone()
+                    if sc_row:
+                        league_scoring_cache[league_id] = dict(zip(sc_cols, sc_row))
+
+                bet_config = league_scoring_cache.get(league_id, config)
                 pts = score_bet(
                     bet["home_score"], bet["away_score"],
                     home_score, away_score,
-                    config,
+                    bet_config,
                 )
                 conn.execute(
                     "UPDATE bets SET points_awarded = ? WHERE id = ?",

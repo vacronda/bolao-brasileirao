@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}{{ league.name }} - Classificação{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-between align-center mt-2 mb-1">
+    <h2 style="font-size:1.3rem;font-weight:700">Classificação</h2>
+    <span class="league-badge {% if 'Brasileir' in league.competition %}brasileirao{% else %}premier{% endif %}" style="font-size:0.65rem">
+        {{ league.name }}
+    </span>
+</div>
+
+<!-- Leaderboard table -->
+{% if leaderboard %}
+<table class="lb-table">
+    <thead>
+        <tr>
+            <th>#</th>
+            <th>Jogador</th>
+            <th>Palpites</th>
+            <th class="lb-stat-cell">Exatos</th>
+            <th class="lb-stat-cell">Zeros</th>
+            <th class="lb-stat-cell">Faltou</th>
+            <th>Pts</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in leaderboard %}
+        <tr class="{% if row.user_id == g.user.id %}lb-me{% endif %} {% if loop.index == 1 %}lb-top1{% elif loop.index == 2 %}lb-top2{% elif loop.index == 3 %}lb-top3{% endif %}">
+            <td class="lb-rank-cell">{{ loop.index }}</td>
+            <td>
+                <div class="lb-name-cell">
+                    {% set avatar = avatars.get(row.user_id) %}
+                    {% if avatar %}
+                    <img src="{{ avatar }}" class="lb-avatar" alt="">
+                    {% else %}
+                    <img src="https://ui-avatars.com/api/?name={{ row.username[:2] }}&size=26&background=random&bold=true&format=svg" class="lb-avatar" alt="">
+                    {% endif %}
+                    {{ row.username }}
+                </div>
+            </td>
+            <td class="lb-stat-cell">{{ row.total_bets }}</td>
+            <td class="lb-stat-cell">{{ row.exact_count }}</td>
+            <td class="lb-stat-cell">{{ row.zero_count }}</td>
+            <td class="lb-stat-cell">{{ row.missed_count }}</td>
+            <td class="lb-pts-cell">{{ row.total_points }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p class="text-muted text-sm">Nenhum jogo finalizado ainda.</p>
+{% endif %}
+
+<!-- Scoring rules -->
+<div class="section-header mt-3"><span>Regras de Pontuação</span></div>
+{% if scoring %}
+<div class="rules-grid">
+    <div class="rule-chip"><div class="pts">{{ scoring.exact_score }}</div><div class="label">Placar Exato</div></div>
+    <div class="rule-chip"><div class="pts">{{ scoring.correct_winner_goal_diff }}</div><div class="label">Vencedor + Saldo</div></div>
+    <div class="rule-chip"><div class="pts">{{ scoring.correct_winner }}</div><div class="label">Vencedor</div></div>
+    <div class="rule-chip"><div class="pts">{{ scoring.correct_draw }}</div><div class="label">Empate</div></div>
+</div>
+{% endif %}
+
+<!-- Invite link -->
+<div class="section-header mt-3"><span>Convidar Amigos</span></div>
+<div class="invite-box">
+    <code id="invite-url">{{ invite_url }}</code>
+    <button type="button" class="btn btn-sm btn-primary copy-btn" onclick="copyInvite(document.getElementById('invite-url').textContent)">Copiar</button>
+</div>
+
+<!-- Members -->
+<div class="section-header mt-3"><span>Membros ({{ members|length }})</span></div>
+{% for m in members %}
+<div class="member-item">
+    {% if m.avatar_url %}
+    <img src="{{ m.avatar_url }}" class="member-avatar" alt="">
+    {% else %}
+    <img src="https://ui-avatars.com/api/?name={{ m.username[:2] }}&size=32&background=random&bold=true&format=svg" class="member-avatar" alt="">
+    {% endif %}
+    <div>
+        <span class="member-name">{{ m.username }}</span>
+        {% if m.role == 'admin' %}
+        <span class="member-badge">Admin</span>
+        {% endif %}
+    </div>
+    {% if league_role == 'admin' and m.role != 'admin' and m.user_id != g.user.id %}
+    <form method="POST" action="{{ url_for('league_remove_member', league_id=league.id) }}" style="margin-left:auto"
+          onsubmit="return confirmAction('Remover {{ m.username }} da liga?')">
+        <input type="hidden" name="user_id" value="{{ m.user_id }}">
+        <button type="submit" class="btn btn-danger btn-sm">Remover</button>
+    </form>
+    {% endif %}
+</div>
+{% endfor %}
+
+<!-- Leave league -->
+{% if league_role != 'admin' %}
+<div class="mt-3 text-center">
+    <form method="POST" action="{{ url_for('league_leave', league_id=league.id) }}"
+          onsubmit="return confirmAction('Tem certeza que deseja sair desta liga?')">
+        <button type="submit" class="btn btn-danger btn-sm">Sair da Liga</button>
+    </form>
+</div>
+{% endif %}
+{% endblock %}

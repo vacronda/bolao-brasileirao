@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Bolão{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <nav class="navbar">
+        <a href="{{ url_for('home') }}" class="navbar-brand">Bolão</a>
+        <button class="nav-toggle">&#9776;</button>
+        <ul class="navbar-nav">
+            {% if g.user %}
+                {% if user_leagues %}
+                <li>
+                    <form method="GET" action="{{ url_for('switch_league') }}" style="display:inline">
+                        <select name="league_id" class="league-select" onchange="this.form.submit()">
+                            {% for lg in user_leagues %}
+                            <option value="{{ lg.id }}" {% if active_league and active_league.id == lg.id %}selected{% endif %}>
+                                {{ lg.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </form>
+                </li>
+                {% endif %}
+                {% if active_league %}
+                <li><a href="{{ url_for('league_dashboard', league_id=active_league.id) }}" class="{% if request.endpoint == 'league_dashboard' %}active{% endif %}">Início</a></li>
+                <li><a href="{{ url_for('league_bets', league_id=active_league.id) }}" class="{% if request.endpoint == 'league_bets' %}active{% endif %}">Palpites</a></li>
+                <li><a href="{{ url_for('league_leaderboard', league_id=active_league.id) }}" class="{% if request.endpoint == 'league_leaderboard' %}active{% endif %}">Classificação</a></li>
+                {% endif %}
+                <li><a href="{{ url_for('leagues_list') }}" class="{% if request.endpoint == 'leagues_list' %}active{% endif %}">Ligas</a></li>
+                {% if g.user.is_admin %}
+                <li><a href="{{ url_for('admin_dashboard') }}" class="{% if 'admin' in request.endpoint|default('') %}active{% endif %}">Admin</a></li>
+                {% endif %}
+                <li class="navbar-user">
+                    <strong>{{ g.user.username }}</strong>
+                    <a href="{{ url_for('logout') }}">Sair</a>
+                </li>
+            {% else %}
+                <li><a href="{{ url_for('login') }}">Entrar</a></li>
+                <li><a href="{{ url_for('register') }}" class="btn btn-primary btn-sm">Criar Conta</a></li>
+            {% endif %}
+        </ul>
+    </nav>
+
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <ul class="flashes">
+            {% for category, message in messages %}
+            <li class="flash flash-{{ category }}">{{ message }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

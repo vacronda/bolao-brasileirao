@@ -1,4 +1,5 @@
-streamlit>=1.30.0
+flask>=3.0
 bcrypt>=4.0.0
 libsql-experimental==0.0.55
-streamlit-cookies-controller
+gunicorn>=21.0
+python-dotenv>=1.0

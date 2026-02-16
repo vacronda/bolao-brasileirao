@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}{{ league.name }} - Palpites{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-between align-center mt-2 mb-1">
+    <h2 style="font-size:1.3rem;font-weight:700">Meus Palpites</h2>
+    <span class="league-badge {% if 'Brasileir' in league.competition %}brasileirao{% else %}premier{% endif %}" style="font-size:0.65rem">
+        {{ league.name }}
+    </span>
+</div>
+
+<!-- Open matches (can still bet) -->
+{% if open_matches %}
+<div class="section-header"><span>Jogos Abertos</span></div>
+<form method="POST" action="{{ url_for('league_bets_submit', league_id=league.id) }}">
+    {% set current_round = namespace(val=None) %}
+    {% for match in open_matches %}
+        {% if match.round_number != current_round.val %}
+            {% set current_round.val = match.round_number %}
+            <div class="text-muted text-sm" style="font-weight:600;margin-top:1rem">Rodada {{ match.round_number or '?' }}</div>
+        {% endif %}
+        <div class="bet-row">
+            <div style="flex:1;min-width:0">
+                <span class="bet-date">{{ match._display_time }}</span>
+                <div class="d-flex align-center gap-1">
+                    <span class="team-name" style="flex:1">
+                        {% if logos.get(match.home_team) %}<img src="{{ logos[match.home_team] }}" alt="">{% endif %}
+                        {{ match.home_team }}
+                    </span>
+                    {% set bet = user_bets.get(match.id) %}
+                    <input type="number" name="home_{{ match.id }}" class="score-input"
+                           value="{{ bet.home_score if bet else '' }}" min="0" max="99">
+                    <span class="score-x">x</span>
+                    <input type="number" name="away_{{ match.id }}" class="score-input"
+                           value="{{ bet.away_score if bet else '' }}" min="0" max="99">
+                    <span class="team-name" style="flex:1;justify-content:flex-end">
+                        {{ match.away_team }}
+                        {% if logos.get(match.away_team) %}<img src="{{ logos[match.away_team] }}" alt="" style="margin-left:6px;margin-right:0">{% endif %}
+                    </span>
+                </div>
+                {% if odds.get(match.id) %}
+                <div class="odds-row">
+                    <span class="odds-badge home">{{ "%.2f"|format(odds[match.id].home_win) }}</span>
+                    <span class="odds-badge draw">{{ "%.2f"|format(odds[match.id].draw) }}</span>
+                    <span class="odds-badge away">{{ "%.2f"|format(odds[match.id].away_win) }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    {% endfor %}
+    <button type="submit" class="btn btn-primary btn-block mt-2">Salvar Palpites</button>
+</form>
+{% endif %}
+
+<!-- Locked matches (already started or finished) -->
+{% if locked_matches %}
+<div class="section-header mt-3"><span>Jogos Encerrados</span></div>
+{% for match in locked_matches %}
+    <div class="bet-row" style="opacity:0.7">
+        <div style="flex:1;min-width:0">
+            <span class="bet-date">{{ match._display_time }} &middot; Rodada {{ match.round_number or '?' }}</span>
+            <div class="d-flex align-center gap-1">
+                <span class="team-name" style="flex:1">
+                    {% if logos.get(match.home_team) %}<img src="{{ logos[match.home_team] }}" alt="">{% endif %}
+                    {{ match.home_team }}
+                </span>
+                {% set bet = user_bets.get(match.id) %}
+                <span class="score-display">{{ bet.home_score if bet else '-' }}</span>
+                <span class="score-x">x</span>
+                <span class="score-display">{{ bet.away_score if bet else '-' }}</span>
+                <span class="team-name" style="flex:1;justify-content:flex-end">
+                    {{ match.away_team }}
+                    {% if logos.get(match.away_team) %}<img src="{{ logos[match.away_team] }}" alt="" style="margin-left:6px;margin-right:0">{% endif %}
+                </span>
+            </div>
+            {% if match.is_finished %}
+            <div class="text-sm text-muted mt-1">
+                Resultado: {{ match.home_score }} x {{ match.away_score }}
+                {% if bet and bet.points_awarded is not none %}
+                    &middot;
+                    {% if bet.points_awarded >= 10 %}
+                    <span class="pts-badge exact">{{ bet.points_awarded }} pts</span>
+                    {% elif bet.points_awarded > 0 %}
+                    <span class="pts-badge good">{{ bet.points_awarded }} pts</span>
+                    {% else %}
+                    <span class="pts-badge zero">0 pts</span>
+                    {% endif %}
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+{% endfor %}
+{% endif %}
+
+{% if not open_matches and not locked_matches %}
+<div class="empty-state mt-3">
+    <p>Nenhum jogo disponível para esta liga.</p>
+</div>
+{% endif %}
+{% endblock %}

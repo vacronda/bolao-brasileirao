@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}{{ league.name }} - Configurações{% endblock %}
+
+{% block content %}
+<h2 class="mt-2" style="font-size:1.3rem;font-weight:700">Configurações da Liga</h2>
+
+<!-- League info -->
+<div class="card mt-2">
+    <h3 class="mb-1" style="font-size:1rem">Informações</h3>
+    <form method="POST" action="{{ url_for('league_settings_update', league_id=league.id) }}">
+        <div class="form-group">
+            <label for="name">Nome da Liga</label>
+            <input type="text" id="name" name="name" class="form-control" value="{{ league.name }}" required>
+        </div>
+        <div class="form-group">
+            <label>Competição</label>
+            <input type="text" class="form-control" value="{{ league.competition }}" disabled>
+        </div>
+        <div class="form-group">
+            <label for="start_date">Data de Início</label>
+            <input type="date" id="start_date" name="start_date" class="form-control" value="{{ league.start_date or '' }}">
+        </div>
+        <div class="form-group">
+            <label for="end_date">Data de Fim</label>
+            <input type="date" id="end_date" name="end_date" class="form-control" value="{{ league.end_date or '' }}">
+        </div>
+        <button type="submit" class="btn btn-primary">Salvar</button>
+    </form>
+</div>
+
+<!-- Scoring config -->
+<div class="card mt-2">
+    <h3 class="mb-1" style="font-size:1rem">Pontuação</h3>
+    <form method="POST" action="{{ url_for('league_scoring_update', league_id=league.id) }}">
+        <div class="rules-grid mb-2">
+            <div class="form-group">
+                <label for="exact_score">Placar Exato</label>
+                <input type="number" id="exact_score" name="exact_score" class="form-control" value="{{ scoring.exact_score }}" min="0">
+            </div>
+            <div class="form-group">
+                <label for="correct_winner_goal_diff">Vencedor + Saldo</label>
+                <input type="number" id="correct_winner_goal_diff" name="correct_winner_goal_diff" class="form-control" value="{{ scoring.correct_winner_goal_diff }}" min="0">
+            </div>
+            <div class="form-group">
+                <label for="correct_winner">Vencedor</label>
+                <input type="number" id="correct_winner" name="correct_winner" class="form-control" value="{{ scoring.correct_winner }}" min="0">
+            </div>
+            <div class="form-group">
+                <label for="correct_draw">Empate</label>
+                <input type="number" id="correct_draw" name="correct_draw" class="form-control" value="{{ scoring.correct_draw }}" min="0">
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="wrong">Erro</label>
+            <input type="number" id="wrong" name="wrong" class="form-control" value="{{ scoring.wrong }}" min="0" style="max-width:200px">
+        </div>
+        <button type="submit" class="btn btn-primary">Salvar e Recalcular Pontos</button>
+    </form>
+</div>
+
+<!-- Invite link -->
+<div class="card mt-2">
+    <h3 class="mb-1" style="font-size:1rem">Convite</h3>
+    <div class="invite-box">
+        <code id="invite-url">{{ invite_url }}</code>
+        <button type="button" class="btn btn-sm btn-primary copy-btn" onclick="copyInvite(document.getElementById('invite-url').textContent)">Copiar</button>
+    </div>
+</div>
+
+<div class="mt-2">
+    <a href="{{ url_for('league_dashboard', league_id=league.id) }}" class="btn btn-secondary">Voltar</a>
+</div>
+{% endblock %}

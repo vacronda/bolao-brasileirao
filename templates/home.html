@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Bolão - Início{% endblock %}
+
+{% block content %}
+{% if not g.user %}
+    <!-- Logged out: hero + auth links -->
+    <div class="hero">
+        <h1>Bolão</h1>
+        <p>Crie suas ligas de palpites com amigos e dispute quem acerta mais!</p>
+        <div class="mt-2">
+            <a href="{{ url_for('login') }}" class="btn btn-outline" style="color:white;border-color:white;margin-right:0.5rem">Entrar</a>
+            <a href="{{ url_for('register') }}" class="btn btn-primary">Criar Conta</a>
+        </div>
+    </div>
+
+    {% if pending_league %}
+    <div class="card">
+        <p class="text-center">
+            Você foi convidado para a liga <strong>{{ pending_league.name }}</strong>!<br>
+            <span class="text-muted text-sm">Faça login ou crie uma conta para participar.</span>
+        </p>
+    </div>
+    {% endif %}
+
+{% elif not user_leagues %}
+    <!-- Logged in but no leagues -->
+    <div class="empty-state mt-3">
+        <h2>Bem-vindo, {{ g.user.username }}!</h2>
+        <p>Você ainda não participa de nenhuma liga. Crie uma ou entre com um código de convite.</p>
+        <a href="{{ url_for('league_create') }}" class="btn btn-primary">Criar Liga</a>
+        <a href="{{ url_for('league_join_form') }}" class="btn btn-outline">Entrar em Liga</a>
+    </div>
+
+{% else %}
+    <!-- Redirect to active league dashboard -->
+    <script>window.location.href = "{{ url_for('league_dashboard', league_id=active_league.id) }}";</script>
+{% endif %}
+{% endblock %}

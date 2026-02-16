@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Bolão - Criar Liga{% endblock %}
+
+{% block content %}
+<div class="card mt-3" style="max-width:500px;margin-left:auto;margin-right:auto">
+    <h2 class="mb-2">Criar Liga</h2>
+    <form method="POST" action="{{ url_for('league_create') }}">
+        <div class="form-group">
+            <label for="name">Nome da Liga</label>
+            <input type="text" id="name" name="name" class="form-control" required placeholder="Ex: Bolão da Família" maxlength="50">
+        </div>
+        <div class="form-group">
+            <label for="competition">Competição</label>
+            <select id="competition" name="competition" class="form-control" required>
+                <option value="Brasileirão">Brasileirão Série A</option>
+                <option value="Premier League">Premier League</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="start_date">Data de Início (opcional)</label>
+            <input type="date" id="start_date" name="start_date" class="form-control">
+        </div>
+        <div class="form-group">
+            <label for="end_date">Data de Fim (opcional)</label>
+            <input type="date" id="end_date" name="end_date" class="form-control">
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Criar Liga</button>
+    </form>
+</div>
+{% endblock %}
