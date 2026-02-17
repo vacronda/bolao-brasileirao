@@ -408,6 +408,23 @@ def create_app():
             flash("Membro removido.", "info")
         return redirect(url_for("league_leaderboard", league_id=league_id))
 
+    @app.route("/league/<int:league_id>/delete", methods=["POST"])
+    @auth.login_required
+    def league_delete(league_id):
+        league = db.get_league_by_id(league_id)
+        if not league:
+            flash("Liga não encontrada.", "danger")
+            return redirect(url_for("leagues_list"))
+        role = db.get_league_member_role(league_id, g.user["id"])
+        if role != "admin" and not auth.is_admin():
+            flash("Sem permissão para deletar esta liga.", "danger")
+            return redirect(url_for("league_dashboard", league_id=league_id))
+        db.delete_league(league_id)
+        if session.get("active_league_id") == league_id:
+            session.pop("active_league_id", None)
+        flash(f"Liga '{league['name']}' deletada.", "info")
+        return redirect(url_for("leagues_list"))
+
     # ─── Admin routes ─────────────────────────────────────────────────────
 
     @app.route("/admin")
@@ -417,10 +434,12 @@ def create_app():
         all_matches = db.get_all_matches() if tab == "matches" else []
         unfinished_matches = db.get_unfinished_matches() if tab == "results" else []
         all_users = db.get_all_users() if tab == "users" else []
+        all_leagues = db.get_all_leagues() if tab == "leagues" else []
         return render_template("admin.html", tab=tab,
                                all_matches=all_matches,
                                unfinished_matches=unfinished_matches,
-                               all_users=all_users)
+                               all_users=all_users,
+                               all_leagues=all_leagues)
 
     @app.route("/admin/match", methods=["POST"])
     @auth.admin_required

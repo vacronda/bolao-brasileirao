@@ -10,6 +10,7 @@
     <a href="{{ url_for('admin_dashboard', tab='add') }}" class="tab {% if tab == 'add' %}active{% endif %}">Adicionar</a>
     <a href="{{ url_for('admin_dashboard', tab='results') }}" class="tab {% if tab == 'results' %}active{% endif %}">Resultados</a>
     <a href="{{ url_for('admin_dashboard', tab='users') }}" class="tab {% if tab == 'users' %}active{% endif %}">Jogadores</a>
+    <a href="{{ url_for('admin_dashboard', tab='leagues') }}" class="tab {% if tab == 'leagues' %}active{% endif %}">Ligas</a>
 </div>
 
 {% if tab == 'add' %}
@@ -95,6 +96,27 @@
     </div>
     {% endif %}
     {% endfor %}
+</div>
+
+{% elif tab == 'leagues' %}
+<!-- Manage leagues -->
+<div class="card">
+    <h3 class="mb-1" style="font-size:1rem">Todas as Ligas</h3>
+    {% for league in all_leagues %}
+    <div class="member-item">
+        <div style="flex:1;min-width:0">
+            <span class="member-name">{{ league.name }}</span>
+            <span class="text-muted text-sm"> &middot; {{ league.competition }} &middot; {{ league.member_count }} membros &middot; criada por {{ league.creator_name }}</span>
+        </div>
+        <form method="POST" action="{{ url_for('league_delete', league_id=league.id) }}" style="margin-left:auto"
+              onsubmit="return confirmAction('Deletar a liga {{ league.name }}? Todos os palpites e membros serão removidos.')">
+            <button type="submit" class="btn btn-danger btn-sm">Deletar</button>
+        </form>
+    </div>
+    {% endfor %}
+    {% if not all_leagues %}
+    <p class="text-muted text-sm">Nenhuma liga cadastrada.</p>
+    {% endif %}
 </div>
 
 {% else %}

@@ -67,6 +67,16 @@
     </div>
 </div>
 
+<!-- Delete league -->
+<div class="card mt-3" style="border:1px solid #e74c3c33">
+    <h3 class="mb-1" style="font-size:1rem;color:#e74c3c">Zona de Perigo</h3>
+    <p class="text-sm text-muted mb-1">Deletar a liga remove todos os palpites e membros permanentemente.</p>
+    <form method="POST" action="{{ url_for('league_delete', league_id=league.id) }}"
+          onsubmit="return confirmAction('Tem certeza que deseja DELETAR a liga {{ league.name }}? Essa ação não pode ser desfeita.')">
+        <button type="submit" class="btn btn-danger">Deletar Liga</button>
+    </form>
+</div>
+
 <div class="mt-2">
     <a href="{{ url_for('league_dashboard', league_id=league.id) }}" class="btn btn-secondary">Voltar</a>
 </div>

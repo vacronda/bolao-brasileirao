@@ -773,6 +773,19 @@ def delete_league(league_id: int):
         conn.execute("DELETE FROM leagues WHERE id = ?", (league_id,))
 
 
+def get_all_leagues() -> list[dict]:
+    """Get all leagues (for site admin). Includes member count and creator username."""
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT l.*,
+                   (SELECT COUNT(*) FROM league_members WHERE league_id = l.id) as member_count,
+                   (SELECT username FROM users WHERE id = l.created_by) as creator_name
+            FROM leagues l
+            ORDER BY l.name
+        """).fetchall()
+        return _to_dicts(rows)
+
+
 # ─── League membership ────────────────────────────────────────────────────────
 
 def join_league(league_id: int, user_id: int) -> bool:
