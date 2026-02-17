@@ -4,6 +4,8 @@ Flask application with user-created leagues.
 """
 
 import os
+import urllib.request
+import json
 from datetime import datetime
 
 from flask import (
@@ -29,6 +31,27 @@ def create_app():
     db.init_db()
     db.cleanup_old_sessions()
 
+    # Turnstile config (optional — if keys not set, only honeypot is used)
+    TURNSTILE_SITE_KEY = os.environ.get("TURNSTILE_SITE_KEY", "")
+    TURNSTILE_SECRET_KEY = os.environ.get("TURNSTILE_SECRET_KEY", "")
+
+    def verify_turnstile(token: str) -> bool:
+        """Verify Cloudflare Turnstile token. Returns True if valid or if Turnstile is not configured."""
+        if not TURNSTILE_SECRET_KEY:
+            return True
+        try:
+            data = json.dumps({"secret": TURNSTILE_SECRET_KEY, "response": token}).encode()
+            req = urllib.request.Request(
+                "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+                data=data,
+                headers={"Content-Type": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                result = json.loads(resp.read())
+            return result.get("success", False)
+        except Exception:
+            return True  # fail open — don't block users if Cloudflare is down
+
     # ─── Before request: restore session ──────────────────────────────────
 
     @app.before_request
@@ -39,7 +62,7 @@ def create_app():
 
     @app.context_processor
     def inject_globals():
-        ctx = {"user_leagues": [], "active_league": None}
+        ctx = {"user_leagues": [], "active_league": None, "turnstile_site_key": TURNSTILE_SITE_KEY}
         if g.user:
             ctx["user_leagues"] = db.get_user_leagues(g.user["id"])
             # Determine active league
@@ -103,6 +126,15 @@ def create_app():
     @app.route("/register", methods=["GET", "POST"])
     def register():
         if request.method == "POST":
+            # Honeypot: if the hidden field is filled, it's a bot
+            if request.form.get("website", ""):
+                flash("Registro bloqueado.", "danger")
+                return redirect(url_for("register"))
+            # Turnstile verification (skipped if not configured)
+            turnstile_token = request.form.get("cf-turnstile-response", "")
+            if TURNSTILE_SECRET_KEY and not verify_turnstile(turnstile_token):
+                flash("Verificação de segurança falhou. Tente novamente.", "danger")
+                return redirect(url_for("register"))
             username = request.form.get("username", "").strip()
             password = request.form.get("password", "")
             password2 = request.form.get("password2", "")

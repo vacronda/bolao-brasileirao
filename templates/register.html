@@ -1,6 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Bolão - Criar Conta{% endblock %}
 
+{% if turnstile_site_key %}
+{% block head %}
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+{% endblock %}
+{% endif %}
+
 {% block content %}
 <div class="card mt-3" style="max-width:400px;margin-left:auto;margin-right:auto">
     <h2 class="text-center mb-2">Criar Conta</h2>
@@ -17,6 +23,13 @@
             <label for="password2">Confirmar Senha</label>
             <input type="password" id="password2" name="password2" class="form-control" required>
         </div>
+        <!-- Honeypot: hidden from humans, bots fill it -->
+        <div style="position:absolute;left:-9999px" aria-hidden="true">
+            <input type="text" name="website" tabindex="-1" autocomplete="off">
+        </div>
+        {% if turnstile_site_key %}
+        <div class="cf-turnstile mb-1" data-sitekey="{{ turnstile_site_key }}" data-theme="light"></div>
+        {% endif %}
         <button type="submit" class="btn btn-primary btn-block">Criar Conta</button>
     </form>
     <p class="text-center text-muted text-sm mt-2">
