@@ -1,7 +1,8 @@
 __pycache__/
 *.pyc
 bolao.db
-.streamlit/secrets.toml
+.env
 .venv/
 venv/
 seed_fixtures.py
+.DS_Store

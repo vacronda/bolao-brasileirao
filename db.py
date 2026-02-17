@@ -431,15 +431,6 @@ def delete_user(user_id: int) -> bool:
         return True
 
 
-def reset_user_password(user_id: int, new_password_hash: str):
-    """Update a user's password hash."""
-    with get_conn() as conn:
-        conn.execute(
-            "UPDATE users SET password_hash = ? WHERE id = ?",
-            (new_password_hash, user_id),
-        )
-
-
 def update_username(user_id: int, new_username: str) -> bool:
     """Update a user's username. Returns False if the new name is already taken."""
     with get_conn() as conn:
@@ -485,38 +476,6 @@ def add_match(round_number: int, home_team: str, away_team: str, match_time: str
             (league, round_number, home_team, away_team, match_time),
         )
         return cur.lastrowid
-
-
-def get_competitions() -> list[str]:
-    """Return distinct competition names from matches."""
-    with get_conn() as conn:
-        rows = conn.execute("SELECT DISTINCT league FROM matches ORDER BY league").fetchall()
-        return [_to_dict(r)["league"] for r in rows]
-
-
-def get_upcoming_matches() -> list[dict]:
-    with get_conn() as conn:
-        rows = conn.execute(
-            "SELECT * FROM matches WHERE is_finished = 0 ORDER BY match_time ASC"
-        ).fetchall()
-        return _to_dicts(rows)
-
-
-def get_matches_next_days(days: int = 7) -> list[dict]:
-    with get_conn() as conn:
-        rows = conn.execute(
-            "SELECT * FROM matches WHERE is_finished = 0 AND match_time <= datetime('now', '+' || ? || ' days') ORDER BY match_time ASC",
-            (str(days),),
-        ).fetchall()
-        return _to_dicts(rows)
-
-
-def get_finished_matches() -> list[dict]:
-    with get_conn() as conn:
-        rows = conn.execute(
-            "SELECT * FROM matches WHERE is_finished = 1 ORDER BY match_time DESC"
-        ).fetchall()
-        return _to_dicts(rows)
 
 
 def get_all_matches() -> list[dict]:
@@ -682,27 +641,6 @@ def get_all_bets_for_match(match_id: int, league_id: int = None) -> list[dict]:
                 (match_id,),
             ).fetchall()
         return _to_dicts(rows)
-
-
-def admin_upsert_bet(user_id: int, match_id: int, home_score: int, away_score: int, league_id: int = None):
-    """Insert or update a bet without time/finished checks (admin override)."""
-    with get_conn() as conn:
-        conn.execute(
-            """INSERT INTO bets (user_id, match_id, league_id, home_score, away_score, updated_at)
-               VALUES (?, ?, ?, ?, ?, datetime('now'))
-               ON CONFLICT(user_id, match_id, league_id) DO UPDATE SET
-                   home_score = excluded.home_score,
-                   away_score = excluded.away_score,
-                   updated_at = datetime('now')
-            """,
-            (user_id, match_id, league_id, home_score, away_score),
-        )
-
-
-def admin_delete_bet(bet_id: int):
-    """Delete a specific bet by ID."""
-    with get_conn() as conn:
-        conn.execute("DELETE FROM bets WHERE id = ?", (bet_id,))
 
 
 # ─── League operations ────────────────────────────────────────────────────────
@@ -1073,30 +1011,6 @@ def get_league_leaderboard_evolution(league_id: int) -> list[dict]:
         return _to_dicts(rows)
 
 
-# ─── Global leaderboard (kept for backward compat) ───────────────────────────
-
-def get_leaderboard() -> list[dict]:
-    with get_conn() as conn:
-        rows = conn.execute("""
-            SELECT
-                u.id as user_id,
-                u.username,
-                COALESCE(SUM(b.points_awarded), 0) as total_points,
-                COALESCE(SUM(CASE WHEN b.points_awarded = (
-                    SELECT exact_score FROM scoring_config WHERE id = 1
-                ) THEN 1 ELSE 0 END), 0) as exact_count,
-                COALESCE(SUM(CASE WHEN b.points_awarded = 0 THEN 1 ELSE 0 END), 0) as zero_count,
-                COUNT(b.id) as total_bets,
-                (SELECT COUNT(*) FROM matches WHERE is_finished = 1) - COUNT(b.id) as missed_count
-            FROM users u
-            LEFT JOIN bets b ON b.user_id = u.id AND b.points_awarded IS NOT NULL
-            WHERE u.is_admin = 0
-            GROUP BY u.id
-            ORDER BY total_points DESC, exact_count DESC, u.username ASC
-        """).fetchall()
-        return _to_dicts(rows)
-
-
 def get_user_avatars() -> dict[int, str]:
     """Return {user_id: avatar_url} for all users that have an avatar."""
     with get_conn() as conn:
@@ -1104,77 +1018,6 @@ def get_user_avatars() -> dict[int, str]:
             "SELECT id, avatar_url FROM users WHERE avatar_url IS NOT NULL AND avatar_url <> ''"
         ).fetchall()
         return {r["id"]: r["avatar_url"] for r in (_to_dicts(rows))}
-
-
-# ─── Scoring config (global, kept for backward compat) ───────────────────────
-
-def get_scoring_config() -> dict:
-    with get_conn() as conn:
-        row = conn.execute("SELECT * FROM scoring_config WHERE id = 1").fetchone()
-        return _to_dict(row)
-
-
-def update_scoring_config(
-    exact_score: int,
-    correct_winner_goal_diff: int,
-    correct_winner: int,
-    correct_draw: int,
-    wrong: int,
-):
-    with get_conn() as conn:
-        conn.execute(
-            """UPDATE scoring_config SET
-                exact_score = ?,
-                correct_winner_goal_diff = ?,
-                correct_winner = ?,
-                correct_draw = ?,
-                wrong = ?
-               WHERE id = 1""",
-            (exact_score, correct_winner_goal_diff, correct_winner, correct_draw, wrong),
-        )
-
-
-def recalculate_all_points():
-    """Recalculate points for all finished matches (used after global scoring config changes)."""
-    with get_conn() as conn:
-        config = _to_dict(
-            conn.execute("SELECT * FROM scoring_config WHERE id = 1").fetchone()
-        )
-        finished = _to_dicts(
-            conn.execute("SELECT * FROM matches WHERE is_finished = 1").fetchall()
-        )
-        for match in finished:
-            bets = _to_dicts(
-                conn.execute("SELECT * FROM bets WHERE match_id = ?", (match["id"],)).fetchall()
-            )
-            for bet in bets:
-                # Use league scoring if available, else global
-                league_id = bet.get("league_id")
-                if league_id:
-                    lconfig = _to_dict(
-                        conn.execute("SELECT * FROM league_scoring WHERE league_id = ?", (league_id,)).fetchone()
-                    )
-                    if lconfig:
-                        points = _score_bet(
-                            bet["home_score"], bet["away_score"],
-                            match["home_score"], match["away_score"],
-                            lconfig,
-                        )
-                        conn.execute(
-                            "UPDATE bets SET points_awarded = ? WHERE id = ?",
-                            (points, bet["id"]),
-                        )
-                        continue
-
-                points = _score_bet(
-                    bet["home_score"], bet["away_score"],
-                    match["home_score"], match["away_score"],
-                    config,
-                )
-                conn.execute(
-                    "UPDATE bets SET points_awarded = ? WHERE id = ?",
-                    (points, bet["id"]),
-                )
 
 
 # ─── Odds operations ─────────────────────────────────────────────────────────
@@ -1276,15 +1119,3 @@ def cleanup_old_sessions(days: int = 30):
         conn.execute("DELETE FROM sessions WHERE created_at < ?", (cutoff,))
 
 
-def get_leaderboard_evolution() -> list[dict]:
-    """Returns rows of (username, match_time, points_awarded) for finished matches."""
-    with get_conn() as conn:
-        rows = conn.execute("""
-            SELECT u.username, m.match_time, COALESCE(b.points_awarded, 0) as points_awarded
-            FROM bets b
-            JOIN users u ON u.id = b.user_id
-            JOIN matches m ON m.id = b.match_id
-            WHERE m.is_finished = 1 AND u.is_admin = 0
-            ORDER BY m.match_time ASC
-        """).fetchall()
-        return _to_dicts(rows)
