@@ -304,6 +304,7 @@ def create_app():
         avatars = db.get_user_avatars()
         upcoming = db.get_league_upcoming_matches(league_id)
         upcoming = _enrich_matches(upcoming)
+        upcoming = [m for m in upcoming if not m["_locked"]]
         user_bets = db.get_user_bets(g.user["id"], league_id)
         league_role = db.get_league_member_role(league_id, g.user["id"])
 
