@@ -52,11 +52,16 @@ def create_app():
         except Exception:
             return True  # fail open — don't block users if Cloudflare is down
 
-    # ─── Before request: restore session ──────────────────────────────────
+    # ─── Request lifecycle: shared DB connection ────────────────────────
 
     @app.before_request
     def before_request():
+        db.begin_shared_conn()
         auth.restore_session()
+
+    @app.teardown_request
+    def teardown_request(exc):
+        db.end_shared_conn(commit=(exc is None))
 
     # ─── Context processor: inject common variables into all templates ────
 

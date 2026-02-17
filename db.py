@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import secrets
+import threading
 from datetime import datetime, timedelta
 from contextlib import contextmanager
 from typing import Optional
@@ -18,6 +19,7 @@ from typing import Optional
 # Local (development): uses a local bolao.db file if env vars are not set
 
 _USE_TURSO = None  # cached flag
+_local = threading.local()  # thread-local storage for request-scoped connection
 
 
 def _get_turso_config() -> tuple[str, str] | None:
@@ -96,6 +98,14 @@ def _connect():
 
 @contextmanager
 def get_conn():
+    """Get a database connection. Reuses a shared request-scoped connection if available."""
+    shared = getattr(_local, 'conn', None)
+    if shared is not None:
+        # Reuse the shared connection — don't commit/close here
+        yield shared
+        return
+
+    # Standalone connection (startup, auto_score, or outside request context)
     conn = _connect()
     try:
         yield conn
@@ -105,6 +115,26 @@ def get_conn():
         raise
     finally:
         conn.close()
+
+
+def begin_shared_conn():
+    """Open a shared connection for the current thread/request.
+    All get_conn() calls will reuse this connection until end_shared_conn()."""
+    _local.conn = _connect()
+
+
+def end_shared_conn(commit=True):
+    """Close the shared connection, committing or rolling back."""
+    conn = getattr(_local, 'conn', None)
+    if conn:
+        try:
+            if commit:
+                conn.commit()
+            else:
+                conn.rollback()
+        finally:
+            conn.close()
+            _local.conn = None
 
 
 def _to_dict(row) -> dict | None:
