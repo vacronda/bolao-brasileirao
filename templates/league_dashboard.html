@@ -61,6 +61,7 @@
 <div class="section-header"><span>Próximos Jogos</span></div>
 {% if upcoming_matches %}
 <form method="POST" action="{{ url_for('league_bets_submit', league_id=league.id) }}">
+    <button type="submit" class="btn btn-primary btn-block mb-2">Salvar Palpites</button>
     {% for match in upcoming_matches %}
     {% set locked = match._locked %}
     <div class="bet-row" {% if locked %}style="opacity:0.5"{% endif %}>

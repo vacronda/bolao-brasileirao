@@ -13,6 +13,7 @@
 {% if open_matches %}
 <div class="section-header"><span>Jogos Abertos</span></div>
 <form method="POST" action="{{ url_for('league_bets_submit', league_id=league.id) }}">
+    <button type="submit" class="btn btn-primary btn-block mb-2">Salvar Palpites</button>
     {% set current_round = namespace(val=None) %}
     {% for match in open_matches %}
         {% if match.round_number != current_round.val %}
