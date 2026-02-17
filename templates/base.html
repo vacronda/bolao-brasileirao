@@ -36,7 +36,7 @@
                 <li><a href="{{ url_for('admin_dashboard') }}" class="{% if 'admin' in request.endpoint|default('') %}active{% endif %}">Admin</a></li>
                 {% endif %}
                 <li class="navbar-user">
-                    <strong>{{ g.user.username }}</strong>
+                    <a href="{{ url_for('profile') }}"><strong>{{ g.user.username }}</strong></a>
                     <a href="{{ url_for('logout') }}">Sair</a>
                 </li>
             {% else %}

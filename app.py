@@ -150,6 +150,50 @@ def create_app():
         already_member = db.is_league_member(league["id"], g.user["id"])
         return render_template("league_join.html", league=league, already_member=already_member)
 
+    # ─── Profile ─────────────────────────────────────────────────────────
+
+    @app.route("/profile", methods=["GET", "POST"])
+    @auth.login_required
+    def profile():
+        user = g.user
+        if request.method == "POST":
+            action = request.form.get("action")
+
+            if action == "username":
+                new_name = request.form.get("username", "").strip()
+                if len(new_name) < 3:
+                    flash("O nome de usuário deve ter pelo menos 3 caracteres.", "warning")
+                elif db.update_username(user["id"], new_name):
+                    flash("Nome de usuário atualizado!", "success")
+                    # Refresh session user data
+                    user = db.get_user_by_username(new_name)
+                    g.user = user
+                else:
+                    flash("Este nome de usuário já está em uso.", "warning")
+
+            elif action == "password":
+                current = request.form.get("current_password", "")
+                new_pw = request.form.get("new_password", "")
+                confirm = request.form.get("confirm_password", "")
+                if not auth.verify_password(current, user["password_hash"]):
+                    flash("Senha atual incorreta.", "danger")
+                elif len(new_pw) < 4:
+                    flash("A nova senha deve ter pelo menos 4 caracteres.", "warning")
+                elif new_pw != confirm:
+                    flash("As senhas não conferem.", "warning")
+                else:
+                    db.update_password(user["id"], auth.hash_password(new_pw))
+                    flash("Senha atualizada!", "success")
+
+            elif action == "avatar":
+                avatar_url = request.form.get("avatar_url", "").strip()
+                db.update_user_avatar(user["id"], avatar_url)
+                flash("Avatar atualizado!" if avatar_url else "Avatar removido.", "success")
+
+            return redirect(url_for("profile"))
+
+        return render_template("profile.html", user=user)
+
     # ─── League switcher ──────────────────────────────────────────────────
 
     @app.route("/switch-league")

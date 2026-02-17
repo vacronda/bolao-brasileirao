@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Bolão - Meu Perfil{% endblock %}
+
+{% block content %}
+<h2 class="mt-2" style="font-size:1.3rem;font-weight:700">Meu Perfil</h2>
+
+<!-- Avatar -->
+<div class="card mt-2">
+    <h3 class="mb-1" style="font-size:1rem">Avatar</h3>
+    <div class="d-flex align-center gap-1 mb-1">
+        {% if user.avatar_url %}
+        <img src="{{ user.avatar_url }}" style="width:64px;height:64px;border-radius:50%;object-fit:cover" alt="Avatar">
+        {% else %}
+        <img src="https://ui-avatars.com/api/?name={{ user.username[:2] }}&size=64&background=random&bold=true&format=svg" style="width:64px;height:64px;border-radius:50%" alt="Avatar">
+        {% endif %}
+    </div>
+    <form method="POST">
+        <input type="hidden" name="action" value="avatar">
+        <div class="form-group">
+            <label for="avatar_url">Link da foto (URL)</label>
+            <input type="url" id="avatar_url" name="avatar_url" class="form-control" value="{{ user.avatar_url or '' }}" placeholder="https://exemplo.com/foto.jpg">
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">Salvar Avatar</button>
+    </form>
+</div>
+
+<!-- Username -->
+<div class="card mt-2">
+    <h3 class="mb-1" style="font-size:1rem">Nome de Usuário</h3>
+    <form method="POST">
+        <input type="hidden" name="action" value="username">
+        <div class="form-group">
+            <label for="username">Novo nome de usuário</label>
+            <input type="text" id="username" name="username" class="form-control" value="{{ user.username }}" minlength="3" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">Salvar Nome</button>
+    </form>
+</div>
+
+<!-- Password -->
+<div class="card mt-2">
+    <h3 class="mb-1" style="font-size:1rem">Alterar Senha</h3>
+    <form method="POST">
+        <input type="hidden" name="action" value="password">
+        <div class="form-group">
+            <label for="current_password">Senha atual</label>
+            <input type="password" id="current_password" name="current_password" class="form-control" required>
+        </div>
+        <div class="form-group">
+            <label for="new_password">Nova senha</label>
+            <input type="password" id="new_password" name="new_password" class="form-control" minlength="4" required>
+        </div>
+        <div class="form-group">
+            <label for="confirm_password">Confirmar nova senha</label>
+            <input type="password" id="confirm_password" name="confirm_password" class="form-control" minlength="4" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">Alterar Senha</button>
+    </form>
+</div>
+{% endblock %}

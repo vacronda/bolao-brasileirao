@@ -458,6 +458,15 @@ def update_username(user_id: int, new_username: str) -> bool:
         return True
 
 
+def update_password(user_id: int, new_password_hash: str):
+    """Update a user's password hash."""
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE users SET password_hash = ? WHERE id = ?",
+            (new_password_hash, user_id),
+        )
+
+
 def update_user_avatar(user_id: int, avatar_url: str):
     """Update a user's avatar URL."""
     with get_conn() as conn:
